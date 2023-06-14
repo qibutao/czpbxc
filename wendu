@@ -1,0 +1,6788 @@
+unsigned char code par1[75]={0x01,0x00,0x00,			//slope
+                     		 0x03,						//peak,valley,average状态
+						     0x00,0x00,0x00,			//【4-6】mode_time
+        	            	 0x01,0x06,0x00,0x00,		//limit_up,以摄氏度存储
+							 0x00,0x06,0x00,0x00,		//limit_down,以摄氏度存储
+    		                 0x00,0x00,0x00,			//【15-17】dead_band
+							 0x00,0x06,0x00,0x00,		//【18-21】ma_start,以摄氏度存储
+							 0x01,0x06,0x00,0x00,		//【22-25】ma_end,以摄氏度存储
+							 0x01,0x02,0x03,0x04,0x05,	//上电识别代码
+							 0x01,						//【31】laser on
+							 0x00,0x00,0x00,0x00,		//【32-35】零点补偿信号,"+,- 9.99mv"，---要更改
+							 0x00,						//[36]c/f,1=c,0=f
+							 0x02,0x09,0x01,0x02,		//limit_up,以华氏度存储
+							 0x01,0x01,0x01,0x02,		//limit_down,以华氏度存储
+							 0x02,0x09,0x01,0x02,		//ma_start,以华氏度存储
+							 0x01,0x01,0x01,0x02,		//ma_end,以华氏度存储
+							 0x05,						//【53】mode_time0.5s
+							 0x00,0x09,0x05,			//[54-56]双色信号允许衰减的百分比
+							 0x00,						//【57】slope-0.000
+							 0x02,						//【58】2-双色，1-单色
+							 0x01,0x00,0x00,			//单色发射率系数
+							 0x01,						//【62】dead_band--0.001
+							 0x01,0x00,0x00,			//63-65"要更改"---单色满度调节，（黑体温度设定为1100度）
+							 							//用于补偿孔径的差异和光学传输中的差异，与单色温度成正比
+							 0x00,0x00,0x00,0x00,		//【66-69】"要更改"---单色零点补偿，（黑体温度设定为610度）零点温度高，零点补偿变大
+							 							//单色零点补偿,第一位为1表示“+“，0表示“-“
+							 0x01,0x00,0x00,0x00,        //70-73"要更改"---"双色满度调节，（黑体温度设定为1100度）与双色温度成正比，
+							                            //调节值生高1，温度上升1.4度
+							 0X01						//opt,上下限选择，1上限，2下限
+					   };
+
+#define  ILLL 655   //数值变大，4MA变大	  大约2个数变大0.01MA		655
+#define	 IHHH 3276	//	大约1.1个数变大0.01MA					    3276
+
+
+
+//S/S025
+#define two_color_start 0xe5	//双色600度数据		  单色:大信号（实测电压(V)*2*65536/7/2.5)，超过6.5V时，乘以实际放大倍数，实测值最大不得超过8V
+#define two_color_end 0x1f27	//双色1600度数据	  双色：y=(ax+b)*4096  x温度值，y是对应的16进制数据，大和小都为实测电压值，(ax+b)=大/小
+#define two_color_a 0.00105039
+#define two_color_b 0.267489
+
+
+
+//单色定标数据代码  D:S=50:1
+//---------------------------------------------------------------------
+unsigned long code table_1c[1001] = {
+
+0x79,0x7c,0x7f,0x83,0x86,0x89,0x8d,0x90,0x93,0x97,	//609
+0x9a,0x9d,0xa1,0xa4,0xa7,0xab,0xae,0xb1,0xb5,0xb8,
+0xbb,0xbe,0xc2,0xc5,0xc8,0xcc,0xcf,0xd2,0xd6,0xd9,
+0xdc,0xe0,0xe3,0xe6,0xea,0xed,0xf0,0xf4,0xf7,0xfa,
+0xfe,0x101,0x104,0x108,0x10b,0x10e,0x112,0x115,0x118,0x11c,
+0x123,0x12a,0x131,0x138,0x13f,0x146,0x14d,0x154,0x15c,0x163,
+0x16a,0x171,0x178,0x17f,0x186,0x18d,0x194,0x19b,0x1a2,0x1a9,
+0x1b1,0x1b8,0x1bf,0x1c6,0x1cd,0x1d4,0x1db,0x1e2,0x1e9,0x1f0,
+0x1f7,0x1fe,0x206,0x20d,0x214,0x21b,0x222,0x229,0x230,0x237,
+0x23e,0x245,0x24c,0x253,0x25b,0x262,0x269,0x270,0x277,0x27e, //699
+0x28c,0x299,0x2a7,0x2b4,0x2c2,0x2cf,0x2dd,0x2eb,0x2f8,0x306,
+0x313,0x321,0x32e,0x33c,0x34a,0x357,0x365,0x372,0x380,0x38d,
+0x39b,0x3a9,0x3b6,0x3c4,0x3d1,0x3df,0x3ec,0x3fa,0x408,0x415,
+0x423,0x430,0x43e,0x44b,0x459,0x467,0x474,0x482,0x48f,0x49d,
+0x4ab,0x4b8,0x4c6,0x4d3,0x4e1,0x4ee,0x4fc,0x50a,0x517,0x525,
+0x53e,0x557,0x570,0x589,0x5a2,0x5bb,0x5d4,0x5ee,0x607,0x620,
+0x639,0x652,0x66b,0x684,0x69d,0x6b6,0x6d0,0x6e9,0x702,0x71b,
+0x734,0x74d,0x766,0x77f,0x798,0x7b2,0x7cb,0x7e4,0x7fd,0x816,
+0x82f,0x848,0x861,0x87a,0x894,0x8ad,0x8c6,0x8df,0x8f8,0x911,
+0x92a,0x943,0x95c,0x976,0x98f,0x9a8,0x9c1,0x9da,0x9f3,0xa0c,//799
+0xa37,0xa63,0xa8e,0xab9,0xae4,0xb0f,0xb3a,0xb66,0xb91,0xbbc,
+0xbe7,0xc12,0xc3d,0xc69,0xc94,0xcbf,0xcea,0xd15,0xd41,0xd6c,
+0xd97,0xdc2,0xded,0xe18,0xe44,0xe6f,0xe9a,0xec5,0xef0,0xf1b,
+0xf47,0xf72,0xf9d,0xfc8,0xff3,0x101e,0x104a,0x1075,0x10a0,0x10cb,
+0x10f6,0x1121,0x114d,0x1178,0x11a3,0x11ce,0x11f9,0x1224,0x1250,0x127b,
+0x12c3,0x130c,0x1354,0x139c,0x13e5,0x142d,0x1475,0x14be,0x1506,0x154e,
+0x1597,0x15df,0x1628,0x1670,0x16b8,0x1701,0x1749,0x1791,0x17da,0x1822,
+0x186b,0x18b3,0x18fb,0x1944,0x198c,0x19d4,0x1a1d,0x1a65,0x1aad,0x1af6,
+0x1b3e,0x1b87,0x1bcf,0x1c17,0x1c60,0x1ca8,0x1cf0,0x1d39,0x1d81,0x1dc9,
+0x1e12,0x1e5a,0x1ea3,0x1eeb,0x1f33,0x1f7c,0x1fc4,0x200c,0x2055,0x209d,	//899
+0x210f,0x2181,0x21f4,0x2266,0x22d8,0x234a,0x23bc,0x242e,0x24a0,0x2512,
+0x2584,0x25f7,0x2669,0x26db,0x274d,0x27bf,0x2831,0x28a3,0x2915,0x2987,
+0x29fa,0x2a6c,0x2ade,0x2b50,0x2bc2,0x2c34,0x2ca6,0x2d18,0x2d8a,0x2dfd,
+0x2e6f,0x2ee1,0x2f53,0x2fc5,0x3037,0x30a9,0x311b,0x318e,0x3200,0x3272,
+0x32e4,0x3356,0x33c8,0x343a,0x34ac,0x351e,0x3591,0x3603,0x3675,0x36e7, //949
+0x379b,0x384f,0x3903,0x39b7,0x3a6b,0x3b20,0x3bd4,0x3c88,0x3d3c,0x3df0,
+0x3ea4,0x3f58,0x400c,0x40c1,0x4175,0x4229,0x42dd,0x4391,0x4445,0x44f9,
+0x45ad,0x4661,0x4716,0x47ca,0x487e,0x4932,0x49e6,0x4a9a,0x4b4e,0x4c02,
+0x4cb6,0x4d6b,0x4e1f,0x4ed3,0x4f87,0x503b,0x50ef,0x51a3,0x5257,0x530c,
+0x53c0,0x5474,0x5528,0x55dc,0x5690,0x5744,0x57f8,0x58ac,0x5961,0x5a15,//999
+0x5aed,0x5bc5,0x5c9d,0x5d75,0x5e4d,0x5f25,0x5ffd,0x60d5,0x61ad,0x6285,
+0x635d,0x6435,0x650d,0x65e5,0x66bd,0x6795,0x686d,0x6945,0x6a1d,0x6af5,
+0x6bcd,0x6ca5,0x6d7d,0x6e55,0x6f2d,0x7005,0x70dd,0x71b5,0x728d,0x7365,
+0x743d,0x7515,0x75ed,0x76c5,0x779d,0x7875,0x794d,0x7a25,0x7afd,0x7bd5,
+0x7cad,0x7d85,0x7e5d,0x7f35,0x800d,0x80e5,0x81bd,0x8295,0x836d,0x8445,//1049
+
+0x85cd,0x8755,0x88de,0x8a66,0x8bee,0x8d76,0x8efe,0x9086,0x920f,0x9397,
+0x951f,0x96a7,0x982f,0x99b7,0x9b40,0x9cc8,0x9e50,0x9fd8,0xa160,0xa2e8,
+0xa471,0xa5f9,0xa781,0xa909,0xaa91,0xac19,0xada2,0xaf2a,0xb0b2,0xb23a,
+0xb3c2,0xb54a,0xb6d3,0xb85b,0xb9e3,0xbb6b,0xbcf3,0xbe7b,0xc004,0xc18c,
+0xc314,0xc49c,0xc624,0xc7ac,0xc935,0xcabd,0xcc45,0xcdcd,0xcf55,0xd0dd,
+0xd2eb,0xd4f9,0xd706,0xd914,0xdb22,0xdd2f,0xdf3d,0xe14a,0xe358,0xe566,
+0xe773,0xe981,0xeb8f,0xed9c,0xefaa,0xf1b8,0xf3c5,0xf5d3,0xf7e0,0xf9ee,
+0xfbfc,0xfe09,0x10017,0x10225,0x10432,0x10640,0x1084e,0x10a5b,0x10c69,0x10e76,
+0x11084,0x11292,0x1149f,0x116ad,0x118bb,0x11ac8,0x11cd6,0x11ee4,0x120f1,0x122ff,
+0x1250c,0x1271a,0x12928,0x12b35,0x12d43,0x12f51,0x1315e,0x1336c,0x1357a,0x13787,
+0x13a5e,0x13d35,0x1400b,0x142e2,0x145b9,0x1488f,0x14b66,0x14e3c,0x15113,0x153ea,
+0x156c0,0x15997,0x15c6e,0x15f44,0x1621b,0x164f2,0x167c8,0x16a9f,0x16d76,0x1704c,
+0x17323,0x175fa,0x178d0,0x17ba7,0x17e7e,0x18154,0x1842b,0x18702,0x189d8,0x18caf,
+0x18f86,0x1925c,0x19533,0x1980a,0x19ae0,0x19db7,0x1a08e,0x1a364,0x1a63b,0x1a912,
+0x1abe8,0x1aebf,0x1b196,0x1b46c,0x1b743,0x1ba1a,0x1bcf0,0x1bfc7,0x1c29e,0x1c574,
+0x1c8fb,0x1cc82,0x1d009,0x1d390,0x1d717,0x1da9e,0x1de25,0x1e1ac,0x1e533,0x1e8ba,
+0x1ec41,0x1efc8,0x1f34f,0x1f6d6,0x1fa5d,0x1fde4,0x2016b,0x204f2,0x20879,0x20c00,
+0x20f87,0x2130e,0x21695,0x21a1c,0x21da3,0x2212a,0x224b1,0x22838,0x22bbf,0x22f46,
+0x232cd,0x23654,0x239da,0x23d61,0x240e8,0x2446f,0x247f6,0x24b7d,0x24f04,0x2528b,
+0x25612,0x25999,0x25d20,0x260a7,0x2642e,0x267b5,0x26b3c,0x26ec3,0x2724a,0x275d1,
+0x27a8e,0x27f4b,0x28407,0x288c4,0x28d81,0x2923e,0x296fa,0x29bb7,0x2a074,0x2a531,
+0x2a9ed,0x2aeaa,0x2b367,0x2b824,0x2bce0,0x2c19d,0x2c65a,0x2cb17,0x2cfd3,0x2d490,
+0x2d94d,0x2de0a,0x2e2c6,0x2e783,0x2ec40,0x2f0fd,0x2f5b9,0x2fa76,0x2ff33,0x303f0,
+0x308ac,0x30d69,0x31226,0x316e3,0x31b9f,0x3205c,0x32519,0x329d6,0x32e92,0x3334f,
+0x3380c,0x33cc9,0x34185,0x34642,0x34aff,0x34fbc,0x35478,0x35935,0x35df2,0x362af,
+0x368c1,0x36ed2,0x374e4,0x37af6,0x38108,0x3871a,0x38d2c,0x3933d,0x3994f,0x39f61,
+0x3a573,0x3ab85,0x3b197,0x3b7a8,0x3bdba,0x3c3cc,0x3c9de,0x3cff0,0x3d602,0x3dc13,
+0x3e225,0x3e837,0x3ee49,0x3f45b,0x3fa6d,0x4007f,0x40690,0x40ca2,0x412b4,0x418c6,
+0x41ed8,0x424ea,0x42afb,0x4310d,0x4371f,0x43d31,0x44343,0x44955,0x44f66,0x45578,
+0x45b8a,0x4619c,0x467ae,0x46dc0,0x473d1,0x479e3,0x47ff5,0x48607,0x48c19,0x4922b,
+0x499b3,0x4a13a,0x4a8c2,0x4b04a,0x4b7d2,0x4bf5a,0x4c6e2,0x4ce6a,0x4d5f2,0x4dd7a,
+0x4e501,0x4ec89,0x4f411,0x4fb99,0x50321,0x50aa9,0x51231,0x519b9,0x52140,0x528c8,
+0x53050,0x537d8,0x53f60,0x546e8,0x54e70,0x555f8,0x55d7f,0x56507,0x56c8f,0x57417,
+0x57b9f,0x58327,0x58aaf,0x59237,0x599bf,0x5a146,0x5a8ce,0x5b056,0x5b7de,0x5bf66,
+0x5c6ee,0x5ce76,0x5d5fe,0x5dd85,0x5e50d,0x5ec95,0x5f41d,0x5fba5,0x6032d,0x60ab5,
+0x6144f,0x61dea,0x62784,0x6311f,0x63ab9,0x64454,0x64dee,0x65788,0x66123,0x66abd,
+0x67458,0x67df2,0x6878d,0x69127,0x69ac2,0x6a45c,0x6adf7,0x6b791,0x6c12c,0x6cac6,
+0x6d460,0x6ddfb,0x6e795,0x6f130,0x6faca,0x70465,0x70dff,0x7179a,0x72134,0x72acf,
+0x73469,0x73e04,0x7479e,0x75138,0x75ad3,0x7646d,0x76e08,0x777a2,0x7813d,0x78ad7,
+0x79472,0x79e0c,0x7a7a7,0x7b141,0x7badc,0x7c476,0x7ce10,0x7d7ab,0x7e145,0x7eae0,
+0x7f68f,0x8023d,0x80dec,0x8199b,0x82549,0x830f8,0x83ca7,0x84855,0x85404,0x85fb3,
+0x86b61,0x87710,0x882bf,0x88e6d,0x89a1c,0x8a5cb,0x8b17a,0x8bd28,0x8c8d7,0x8d486,
+0x8e034,0x8ebe3,0x8f792,0x90340,0x90eef,0x91a9e,0x9264c,0x931fb,0x93daa,0x94958,
+0x95507,0x960b6,0x96c65,0x97813,0x983c2,0x98f71,0x99b1f,0x9a6ce,0x9b27d,0x9be2b,
+0x9c9da,0x9d589,0x9e137,0x9ece6,0x9f895,0xa0444,0xa0ff2,0xa1ba1,0xa2750,0xa32fe,//1500
+
+
+0xa40fb,0xa4ef7,0xa5cf4,0xa6af1,0xa78ed,0xa86ea,0xa94e6,0xaa2e3,0xab0e0,0xabedc,
+0xaccd9,0xadad5,0xae8d2,0xaf6ce,0xb04cb,0xb12c8,0xb20c4,0xb2ec1,0xb3cbd,0xb4aba,
+0xb58b7,0xb66b3,0xb74b0,0xb82ac,0xb90a9,0xb9ea6,0xbaca2,0xbba9f,0xbc89b,0xbd698,
+0xbe494,0xbf291,0xc008e,0xc0e8a,0xc1c87,0xc2a83,0xc3880,0xc467d,0xc5479,0xc6276,
+0xc7072,0xc7e6f,0xc8c6c,0xc9a68,0xca865,0xcb661,0xcc45e,0xcd25a,0xce057,0xcee54,
+0xcffb5,0xd1116,0xd2277,0xd33d7,0xd4538,0xd5699,0xd67fa,0xd795b,0xd8abc,0xd9c1d,
+0xdad7e,0xdbedf,0xdd040,0xde1a1,0xdf302,0xe0463,0xe15c4,0xe2725,0xe3886,0xe49e7,
+0xe5b48,0xe6ca9,0xe7e0a,0xe8f6b,0xea0cc,0xeb22d,0xec38e,0xed4ee,0xee64f,0xef7b0,
+0xf0911,0xf1a72,0xf2bd3,0xf3d34,0xf4e95,0xf5ff6,0xf7157,0xf82b8,0xf9419,0xfa57a,
+0xfb6db,0xfc83c,0xfd99d,0xfeafe,0xffc5f,0x100dc0,0x101f21,0x103082,0x1041e3,0x105344,//1599
+0x106444
+
+};
+
+
+
+#include <stdio.h>
+#include <c8051f000.h>				// SFR declarations
+#include <math.h>
+
+sfr16 ADC0	=0xbe;					// ADC0数据
+sfr16 DAC0	=0xd2;             		// DAC0数据
+sfr16 DAC1  =0xd5;
+
+#define XTLVLD_BIT  0x80			// oscxcn.7晶体振荡器有效标志
+#define uchar unsigned char
+#define uint unsigned int
+#define ulong unsigned long  
+/*
+#define	SLOPE_2C 1000		//双色满度调节，（黑体温度设定为1100度）与双色温度成正比，调节值变高1，温度上升1.4度
+#define V1C_OFFSET 0		//单色零点补偿，（黑体温度设定为610度）零点温度高，零点补偿变大
+#define EMISS_K_1C 100	//单色满度调节，（黑体温度设定为1100度）用于补偿孔径的差异和光学传输中的差异，与单色温度成正比
+*/						
+
+//---------------------------------------------------------------
+//函数原型
+//---------------------------------------------------------------
+void sysclk_init(void);
+void watchdog_init(void);
+void xbar_init(void);
+void Comparator_Init(void);
+void int0_isr(void);
+sbit erase_enable=P0^4;
+//void PCA_Init(void);
+
+
+//ad
+#define TC	127		  	 			//定时器3在11.0592MHz/12--AD一个周期为10ms
+
+long data tobj_real;				//ad采样之后的实时值
+long idata tobj_temp_max;
+long idata tobj_temp_min;
+long tobj_result;					//数据处理完之后目标温度的值,用于显示
+long data tobj_real_one;			//单色信号
+
+//uint idata au;
+
+char idata tambient_result1=0;		//目标温度数据,用于显示								  
+bit tambient_alarm;					//环境温度过高,过低标志
+void disp_tambient_alarm(void);		//环境温度过高,过低报警显示
+
+uint data disp_value;
+
+//ulong data real_out;
+
+void pga_init(void);
+void display0(void);				//AD转换结果16位
+void adc_init(void);		//ADC0初始化
+void time3_init(void);		//T3初始化
+void adc_isr(void);		   //ADC0中断子程序
+void tambient(void);	  //不用
+void disp_sample_value(void);  //不用
+
+void tc_low_enable(void);	//双色信号允许衰减判断
+void sample_state(void);	//采样模式子程序
+void sample_peak(void);		//峰值保持子程序
+void sample_valley(void);	//谷值保持子程序
+void sample_average(void);	//平均值子程序
+uchar p_v_count=0;
+//void sample_valley(void);
+
+//void data_process(void);			//f(obj,ta)
+bit tobj_ad_finish;
+bit tambient_ad_finish;
+bit tambient_disp_enable;
+
+//D/A
+void dac_out(void);
+void dac_init(void);
+
+
+//disp
+void disp0(void);		//显示600摄氏度
+//void disp1(void);
+void display(void);
+void ini7219(void);
+void send(void);
+void tambient_disp(void);
+void disp(uchar m);  
+void disp2(uchar m);  
+
+void disp_single(void);
+//void disp_tobj_result_big(void);
+//void disp_tobj_resutl_small(void);
+
+uchar bdata x,y;
+
+uchar bdata order;
+sbit order7=order^7;
+sbit order6=order^6;
+sbit order5=order^5;
+sbit order4=order^4;
+sbit order3=order^3;
+sbit order2=order^2;
+sbit order1=order^1;
+sbit order0=order^0;
+
+uchar code seg0[21]={0x7e,0x30,0x6d,0x79,0x33,0x5b,0x5f,0x70,0x7f,0x7b,0x77,0x1f,0x4e,0x3d,0x4f,0x47,0x00,0xf8,0x01,0x76,0xb9};
+                    // 0,   1,   2,   3,   4,   5,   6,   7,   8,   9 , A ,   b,   C,   d,   E,   F,   "",  ℃,   -,   N , ℉;
+					//℃，℉将数码管反转180度										
+//uchar seg0[19]={0xb7,0x84,0xd3,0xd6,0xe4,0x76,0x77,0x94,0xf7,0xf6,0xf5,0x67,0x33,0xc7,0x73,0x71,0x00,0x40,0x10};                            
+
+uchar code seg1[16]={0xfe,0xb0,0xed,0xf9,0xb3,0xdb,0xdf,0xf0,0xff,0xfb,0x37,0x0e,0x67,0x46,0x3e,0x1d,};
+               		//"0.","1.","2.","3.","4.","5.","6.","7.","8.","9.","H","L",   P	T	U	  o
+//uchar seg1[12]={0xbf,0x8c,0xdb,0xde,0xec,0x7e,0x7f,0x9c,0xff,0xfe,0xe5,0x23};			       
+
+
+
+//keyboard flag;
+sbit function=P1^0;
+sbit shift_right=P1^1;
+sbit up=P1^2;
+sbit enter=P1^3;
+bit find_key;				//有按键操作时,不允许显示温度值
+
+//display
+//D7      D6      D5        D4       D3            D2             D1         D0
+//DP      A       B         C         D            E              F           G
+//0      over1  oc_tc_led   low1   peak_value   average_value  valley_value   0
+uchar bdata out_led;	//指示灯控制，用max7219的第6位
+sbit out_led7=order^7;	 //不用
+sbit over1=out_led^6;	 //上限指示灯
+sbit oc_tc_led=out_led^5;  //双色指示灯
+sbit low1=out_led^4;	 //下限指示灯
+sbit peak_value=out_led^3;	//峰值指示灯
+sbit average_value=out_led^2;  //平均值指示灯
+sbit valley_value=out_led^1;   //谷值指示灯
+sbit out_led0=out_led^0;	   //不用
+sbit txd=P1^4;		 //7219=clk
+sbit rxd=P2^0;		 //7219=DIN
+sbit max7219cs=P1^5;	//cs=7221,load=7219		
+
+
+//sample
+sbit a1=P2^2;		//add_check
+sbit a0=P1^6;		//add_check
+sbit pre_gain_control=P2^3;
+sbit pre_en=P3^4;	//新增,add_check
+sbit tobj_wr=P3^5;	//新增
+bit pre_gain_flag;
+sbit shc_control=P1^7;	//采样保持控制,add_check
+
+
+//output 
+sbit low=P2^4;		
+sbit over=P2^5;
+sbit laser_control=P2^1;  //激光控制
+sbit out_control=P3^0;	//PNP电平输出
+sbit heat_control=P3^1;	//恒温控制
+sbit iout_alarm=P3^2;	//电流输出故障报警，原先没有
+sbit ma_on_off=P3^3;	//4mA或0mA输出可编程，原先没有
+
+//铁电存储器
+sbit flash_wp=P3^6;		//新增
+sbit flash_cs=P3^7;		//新增
+sbit flash_hold=P2^6;	//新增
+
+//串口发送接收使能
+sbit send_enable=P2^7;
+
+//key
+uchar idata key_value;
+
+uchar data e,e1,f,f1,g,g1,h,h1;	//存储参数（共八位）
+
+bit c_f_flag;        //c/f 选择，i=0为c，i=1为f
+
+void disp_c_f_state(void);   //c/f 选择
+void disp_c_f_state1(void);
+void disp_c_f_c(void);
+void disp_c_f_f(void);
+void disp_1c_2c_state(void);
+void scan_keyboard(void);
+//void c_f_select(void);
+void send(void);
+void timer10_init(void);
+void timer0_isr(void);
+void timer1_isr(void);
+
+//uart
+void t2_init(void); 
+void uart_init(void);
+void sl(void);		   //RS485设置双色斜率
+void se(void);		   //RS485设置单色发射率
+void sm(void);		   //RS485设置测温模式
+void rt(void);		   //RS485设置测温模式时间
+void dm(void);		   //RS485设置温度单位
+void dt(void);		   //RS485设置单色双色选择
+void oc_adj(void);		//单色系数矫正，用于标定
+void oc_zero(void);		//单色零点补偿，用于标定
+void tc_adj(void);		//双色系数矫正，用于标定
+void lu_ld_as_ae(void);
+void db(void);			//RS485设置报警信号回差
+void disp_pa(void);//显示FLASH参数
+void reset_pa(void);//复位Flash
+void str(void);
+bit lu_ld_as_ae_enable=0;
+bit str_enable=0;
+uint idata  ri_time=0;
+bit ri_time_enable=0;
+
+void emissivity_slope(void);
+void emiss_adj1(void);
+void slope_adj2(void);
+void ambient(void);
+void state(void);
+void mode_time(void);
+void limit_up(void);	//上限报警
+void limit_up0(void);	//显示当前的上限报警值
+void limit_down(void);	//下限报警
+void limit_down0(void);	//显示当前的下限报警值
+void dead_band(void);	
+void ma_start(void);	//电流环起始值
+void ma_start0(void);	//显示当前的电流环起始值
+void ma_end(void);		//电流环终点值
+void ma_end0(void);		//显示当前的电流环终点值
+void cf_select(void);	//cf转换后最后一位的取舍
+void opt(void);			//上下限报警选择，1上限  2下限
+
+void disp_emissivity_3(void);
+void disp_emissivity0_3(void);
+void disp_emissivity_4(void);
+void disp_emissivity0_4(void);
+void disp_state(void);
+void disp_mode_time(void);
+void disp_mode_time0(void);
+void disp_limit_up(void);
+void disp_limit_up0(void);
+
+void shift0_3(void);
+void shift0_4(void);
+void shift1(void);
+void shift21(void);
+void shift2(void);
+void shift3(void);
+void key_value_range_0to2000(void);
+
+void disp_zero_compensate(void);
+void disp_2c_low(void);
+void disp_zero0(void);
+void disp_zero_temp(void);
+void disp_zero(void);
+
+void key_flag_init(void);
+
+uchar idata function_flag;
+//uchar idata flag;
+uchar idata up_flag;
+uchar idata shift_right_flag;
+uchar idata enter_flag;
+uchar idata up_shift_flag;	 //组合键
+//uchar idata sample_flag;
+
+void delay(int n);
+
+//flash 
+uchar xdata *pwrite;//外部数据缓冲区
+uchar code *pread;
+//uchar xdata *par_buf;
+uchar pdata par_buf[75];//从单片机内部的flash读出数据到XRAM
+
+//外部数据缓冲区,存储空间为0x0400---1024开始,用于参数,数据采集代码的存储空间		
+uchar *par;
+
+//laser
+void laser(void);
+ulong idata laser_time_count;	//激光开启时间计数器
+void disp_laser_on(void);
+void disp_laser_off(void);
+void disp_laser_state(void);
+void disp_laser_state1(void);
+void disp_laser_state2(void);
+
+
+//恒温控制
+void heat(void);
+
+//led
+void alarm_state(void);
+void led_state(void);
+
+void erase_par(void);		//擦除该页中的所有位
+void init_par(void);		//初始化变量
+void read_par(void);        //从flash读变量
+void write_par(void);       //将修改好后的数据写入flash
+
+
+//AD采样暂存数据
+uint idata sample_count;
+uint idata sample_count_set;
+
+bit sample_round;		//采样一个周期10ms
+
+//初始化端口输出
+void init_port(void);	
+
+
+
+
+//主程序
+//---------------------------------------------------------------
+void main(void)
+{   
+	uchar idata i;
+	WDTCN=0xde;						//禁止看门狗定时器
+	WDTCN=0xad;
+	sysclk_init();					//初始化振荡器
+	xbar_init();					//初始化外部交叉开关
+	//PCA_Init();
+    watchdog_init();				//初始化看门狗
+	WDTCN=0xa5;	
+	ini7219();	
+	timer10_init();
+	t2_init();
+	uart_init();
+	Comparator_Init();
+	disp0();	//上电显示"600"						
+	//delay(1000);	
+ 	//time3_init();	
+	adc_init();
+	dac_init();	
+	pga_init();
+	key_flag_init();
+	EA=0;
+	read_par();
+	//par_buf=0x0400;
+	if (( (par_buf[26]==0x01)&&(par_buf[27]==0x02)&&(par_buf[28]==0x03)
+	    &&(par_buf[29]==0x04)&&(par_buf[30]==0x05))==0)
+    {
+	  	erase_par();
+		init_par();
+	}
+	for (i=0;i<74;i++)
+	{
+		if ( par_buf[i]>9)
+		{
+			erase_par();
+			init_par();
+		}
+	}
+	read_par();		//将片内的FLASH信息读出来，上电信息
+	time3_init();
+	sample_round=0;
+	tobj_result=0L;
+	tobj_ad_finish=0;
+	tambient_ad_finish=0;
+	tambient_disp_enable=0;
+	tambient_alarm=0;
+	pre_gain_flag=1;
+	sample_count=0;
+	find_key=0;   
+	laser_time_count=90000;		//激光开启时间(30分钟)初始值
+	tobj_real=0;
+	init_port();
+	ET0=1;
+	//EX0=1;
+	EA=1;
+    for(;;)
+	{  
+		ini7219();
+		WDTCN=0xa5;	
+		scan_keyboard();  
+		sample_state();			//当前数据的采集模式		   
+		display(); 				//显示当前的目标温度
+		disp_tambient_alarm();	//环境温度过高，过低指示
+    	alarm_state();
+		led_state();
+		laser();
+		str();
+	}
+}
+
+void init_port(void)
+{
+	low=0;
+	over=0;
+	max7219cs=1;
+	low1=1;
+	peak_value=0;
+	average_value=0;
+	valley_value=0;
+	over1=1;
+	oc_tc_led=0;	//2c
+	laser_control=0;		
+	out_control=1;
+	pre_gain_control=1;	
+	pre_en=1;
+	tobj_wr=0;
+	shc_control=0;				//保持模式
+	heat_control=1;				//加热器关闭
+	send_enable=1;
+}
+
+
+
+
+//-----------------------------------------------------------------------------
+//使用12MHz晶体振荡器作为系统时钟源
+//-----------------------------------------------------------------------------
+void sysclk_init(void)
+{
+	uint data i;						//延时计数器
+	OSCXCN=0x67;				//启动使用外部晶体振荡器
+    for(i=0;i<256;i++)		//等待时间>1ms
+	while( (OSCXCN&0x80==0) );  //等待外部晶体振荡器稳定
+	OSCICN=0x88;				//选用外部振荡器为sysclk
+								//允许时钟丢失检测器工作
+/*	OSCXCN = 0x30;	// EXTERNAL Oscillator Control Register	
+
+	OSCICN = 0x86;	// Internal Oscillator Control Register*/
+
+} 
+
+
+//------------------------------------------------------------------
+//watchdog_init
+//------------------------------------------------------------------
+void watchdog_init(void)
+{
+    EA=0;
+	WDTCN=0xff;					//锁定WDT
+    WDTCN=0x07;					//设定WDT定时时间间隔	   
+								//6MHz时为174.6ms
+	EA=1;
+ 	WDTCN=0xa5;					//允许看门狗定时器,重载
+}
+ 
+
+void xbar_init(void)
+{
+    // P0.0  -  SCK  (SPI0), Open-Drain  
+    // P0.1  -  MISO (SPI0), Push-Pull   
+    // P0.2  -  MOSI (SPI0), Open-Drain  
+    // P0.3  -  NSS  (SPI0), Open-Drain  
+    // P0.4  -  TX   (UART), Open-Drain  
+    // P0.5  -  RX   (UART), Open-Drain  
+    // P0.6  -  CP0  (Cmp0), Push-Pull   
+    // P0.7  -  INT0 (Tmr0), Open-Drain  
+
+    // P1.0  -  K1,  Open-Drain  
+    // P1.1  -  K2,  Open-Drain  
+    // P1.2  -  K3,  Open-Drain  
+    // P1.3  -  K4,  Open-Drain  
+    // P1.4  -  TXD,  Open-Drain  
+    // P1.5  -  MAX7219CS,  Open-Drain  
+    // P1.6  -  A0,  Push-Pull   
+    // P1.7  -  SHC_control,  Push-Pull   
+
+    // P2.0  -  RXD,  Open-Drain  
+    // P2.1  -  LASTER_control,  Open-Drain  
+    // P2.2  -  A1,  Open-Drain  
+    // P2.3  -  PRE_GAIN,  Open-Drain  
+    // P2.4  -  LOW,  Open-Drain  
+    // P2.5  -  OVER,  Open-Drain  
+    // P2.6  -  FLASH_HOLD,  Push-Pull   
+    // P2.7  -  Unassigned,  Open-Drain  
+
+	// P3.0  -  out_control,  Open-Drain  
+    // P3.1  -  heat_control,  Open-Drain  
+    // P3.2  -  iout_alarm,  Open-Drain  
+    // P3.3  -  ma_on_off,  Open-Drain  
+    // P3.4  -  pre_en,  Open-Drain  
+    // P3.5  -  tobj_wr,  Open-Drain  
+    // P3.6  -  flash_wp,  Push-Pull   
+    // P3.7  -  flash_cs,  Push-Pull 
+
+    PRT0CF    = 0x42;  //01000010	 p0.1,p0.6为推挽输出
+    PRT1CF    = 0xC0;  //11000000  p1.7,p1.6为推挽输出
+    PRT2CF    = 0x40;  //01000000  p2.6为推挽输出
+    PRT3CF    = 0xC0;  //11000000  p3.7,p3.6为推挽输出
+    XBR0      = 0x86;  //10000110  启用比较器cp0，TX,RX，SPI（4个脚）
+    XBR1      = 0x04;  //启用/int0
+    XBR2      = 0x40;  //01000000  开交叉开关，弱上拉使能（除了I/0被配置为推挽方式的端口）
+
+}
+
+//比较器0初始化
+void Comparator_Init()
+{
+    int i = 0;
+    CPT0CN    = 0x8F;	//10001111	   比较器0开，回差正负10mv
+    for (i = 0; i < 60; i++);  // Wait 20us for initialization
+    CPT0CN    &= ~0x30;	
+	//将比较器的下降沿中断给INT0	   
+}
+
+/*
+void PCA_Init()
+{
+	//占空比改变只需向PCA0CPH0写入一个数，
+	PCA0MD=0x02;		//禁止CF中断
+	//PCA时基=SYSCLK/4
+	PCA0CPL0=0x00;
+	PCA0CPH0=0x00;
+	PCA0CPM0=0x42;		//CCM0为8位PWM方式
+	PCA0CN=0x40;		//允许PCA计数器
+}
+*/
+
+
+
+//						    AD.C
+//***********************************************************
+//选用外部振荡器作为系统的时钟,并使其工作频率为11.0592MHz
+
+//使用定时器3溢出作为转换启动源
+//定时器3配置为自动重装载方式,每0.033ms溢出一次
+//ADC数据设置为左对齐方式
+//采样频率由<SAMPLE_RATE>确定(SAR时钟=SYSCLK/8=1.39MHz
+//一次转换需要16个SAR时钟,1.39MHz/16=86.88KHz)≈12us
+       
+//ADC转换结束中断处理程序从ADC取出样本值并将加到一个运行累加器
+//<result>中,连续采样64个样本,并对其求均值（64/4=16，原数据扩大
+//16倍），相当于原12位的ADC变成16位的ADC 
+
+//提取ADC样本,并将其加入到运行变量<accumulator>中,并将局部抽取
+//计数器<count>减一。当<count>减到0时,计算全局变量<result>的新值,
+//<result>中保存累加后的ADC的值。
+//**************************************************************
+
+
+//配置A/D转换器使用time3溢出为转换启动源,转换完成时产生中断,
+//使用右对齐输出方式.允许adc转换结束中断,重置adc为禁止状态.
+void adc_init(void)
+{
+   ADC0CN = 0x44;            	// ADC禁止,正常跟踪方式
+                                // ADC变换初始化为定时器3溢出方式 
+                                // ADC数据为右对齐方式 
+   REF0CN = 0x02;               // 片内ADC和DAC偏压允许
+                                // 使用片外电压基准
+   AMX0CF = 0x00;				// AIN2为独立的单端输入方式
+   AMX0SL = 0x02;               // 选择AIN2通道
+   ADC0CF = 0x80;               // ADC转换时钟=sysclk/16
+             			        // 内部增益=1
+   EIE2|=0x02;                	// 允许ADC0转换结束的中断请求
+   EIP2|=0x02;
+   ADCEN=1;
+  //tobj_average=tobj_average_start;
+}
+
+void dac_init(void)
+{
+	DAC0CN=0x80;
+	DAC1CN=0x80;
+}
+
+void pga_init(void)
+{
+	a1=0;
+	a0=0;
+}
+
+//配置定时器3为自动重装载方式,定时间隔为0.39ms产生中断,
+//使用sysclk/12作为时基
+void time3_init(void)
+{  
+    uint data value;
+	value=65536-TC;  
+	TMR3CN=0;						//定时器3停止,清除TF3
+	TMR3RLH=value/256;				//初始化重载值
+	TMR3RLL=value%256;
+	TMR3H=0xff;						//立即重载值
+	TMR3L=0xff;				
+	EIE2&=~0x01;					//不允许time3的中断请求
+	TMR3CN|=0x04;					//启动定时器3
+}									
+
+
+uchar str_count=0;
+void adc_isr(void) interrupt 15 using 1
+{
+	long idata tambient_result;		//环境温度信号
+    static uint tobj_count_big=515;
+	static uint tobj_count_small=257;
+	static uchar tambient_count=17;
+	uint  i;		//延时计数器
+	static long tobj_accumulator_big=0L;
+	static long tobj_accumulator_small=0L;
+	static long tambient_accumulator=0L;		
+
+    long data  tobj_result_big;		//目标温度信号与直流漂移信号的总和
+	long data  tobj_result_big_temp;
+	long data  tobj_result_small;	
+
+	//long idata tambient_result;		//环境温度信号
+	long idata tobj_real_one_temp;
+	uint idata au;
+	//uint data tobj_real_temp;		//每次ad采样的实时值
+	//static uchar sum_count=0;
+	//ulong idata sum;				
+	//uint idata tobj_real_max;
+	//uint idata tobj_real_min;
+	ulong idata tobj_result_temp;	//比值信号
+	//long zero_compensate;			//零点补偿电压,为节省变量空间,用tambient_result替代
+
+
+   	ADCINT=0;			//清除ADC转换结束
+	heat();
+	if (AMX0SL==0x02)
+	{
+		if (tambient_count==17)
+		{
+			ADC0CF=0x80;   //SAR=8个系统时钟，ADC0内部放大器增益=1
+			ADC0=0;		//用于消除临近通道的转换干扰
+		    for(i=0;i<2000;i++);		//等待时间>0.05ms
+		}
+		else if (tambient_count!=17)
+		{
+			tambient_accumulator=tambient_accumulator+ADC0;
+		}
+		tambient_count--;
+		tambient_ad_finish=0;
+		if (tambient_count==0)
+		{	
+			EA=0; 
+			//环境温度值AD转换结束标志
+			tambient_ad_finish=1;
+			tambient_count=17;
+			tambient_result=tambient_accumulator>>4;  //除以16（加了16次，求平均值）
+			//X*125/2048-50
+			tambient_result=( (tambient_result*125)>>11 )-50;
+			/*
+			tambient_result=tambient_result-0x0a7c;
+			tambient_result=tambient_result*100;
+			tambient_result=tambient_result/0x03d6;	
+			*/
+
+			tambient_result1=(char) (tambient_result);
+			tambient_accumulator=0L;			   
+			AMX0SL=0x01;
+			shc_control=0;
+			EA=1;
+		}	
+	 }
+	else if (AMX0SL==0x01)
+	{	
+		if (tobj_count_big==515)
+		{
+			ADC0=0;		//用于消除临近通道的转换干扰
+			tobj_accumulator_big=0L;
+			au=1;
+			a1=0;
+			a0=0;
+			ADC0CF=0x80;
+			shc_control=1;			//on
+			for(i=0;i<2000;i++);	//等待时间>0.6ms	
+			shc_control=0;
+		}	
+		if ( (tobj_count_big==515)||(tobj_count_big==257) )
+		{
+			tobj_accumulator_big=0L;
+		}
+		else 
+		{
+			tobj_accumulator_big=tobj_accumulator_big+ADC0;
+		}
+		tobj_count_big--;
+   	  	if(tobj_count_big==258)
+   	  	{
+			tobj_result_big=tobj_accumulator_big>>4;   //加了64次，除以4，数据放大16倍
+			tobj_result_big_temp=(uint)(tobj_result_big);
+		//pga
+		//取满幅度电压为2000mv,程控放大器AD8253与内部PGA一起操作
+		//第一档,0-2.5mv,Au=1000;1000*1;
+		//第二档,2.5-5mv,Au=400;100*4;
+		//第三档,5-10mv,Au=200;100*2;
+		//第四档,10-20mv,Au=100;100*1;
+		//第五档,20-50mv,Au=40;10*4;
+		//第六档,50-100mv,Au=20;10*2;
+		//第七档,100-200mv,Au=10;10*1;
+		//第八档,200-500mv,Au=4;1*4;
+		//第九档,500-1000mv,Au=2;1*2;
+		//第十档,>1000mv,Au=1;1*1;
+		 	au=1;
+			a1=0;
+			a0=0;
+			ADC0CF=0x80;
+
+		/*	if ( (0x00<=tobj_result_big_temp)&&(tobj_result_big_temp<0x041) )		//0-2.5mv					2.5/2500*4096
+			{
+				au=1000;		//1000
+				a1=1;		   //a0,a1控制数字电位器
+				a0=1;
+				ADC0CF=0x60;
+			}	
+		    else if ( (0x41<=tobj_result_big_temp)&&(tobj_result_big_temp<0x083) )	//2.5-5mv
+			{
+				au=400;		//100*4
+				a1=1;
+				a0=0;
+				ADC0CF=0x62;
+			}
+		    else if ( (0x83<=tobj_result_big_temp)&&(tobj_result_big_temp<0x0106) )	//5-10mv
+			{
+				au=200;		//100*2
+				a1=1;
+				a0=0;
+				ADC0CF=0x61;
+			}
+			else if ( (0x0106<=tobj_result_big_temp)&&(tobj_result_big_temp<0x020c) )//10-20mv
+			{
+				au=100;		//100*1
+				a1=1;	
+				a0=0;
+				ADC0CF=0x60;
+			}
+			else if ( (0x020c<=tobj_result_big_temp)&&(tobj_result_big_temp<0x051e) )//20-50mv
+			{
+				au=40;		//10*4
+				a1=0;		
+				a0=1;
+				ADC0CF=0x62;
+			}
+		 	else if ( (0x051e<=tobj_result_big_temp)&&(tobj_result_big_temp<0x0a3d) )//50-100mv
+			{
+				au=20;		//10*2
+				a1=0;		
+				a0=1;
+				ADC0CF=0x61;
+			}
+			else if ( (0x0a3d<=tobj_result_big_temp)&&(tobj_result_big_temp<0x147a) )//100-200mv
+			{
+				au=10;		//10*1
+				a1=0;
+				a0=1;  
+				ADC0CF=0x60;
+			}
+			else if ( (0x147a<=tobj_result_big_temp)&&(tobj_result_big_temp<0x3333) )//200-500mv
+			{
+				au=4;		//1*4
+				a1=0;
+				a0=0;
+				ADC0CF=0x62;
+			}										
+			else if ( (0x3333<=tobj_result_big_temp)&&(tobj_result_big_temp<0x6666) )	//500-1000mv
+			{
+				au=2;		//1*2
+				a1=0;
+				a0=0;
+				ADC0CF=0x61;
+			}	  */
+		   
+		    if ( (0x00<=tobj_result_big_temp)&&(tobj_result_big_temp<0xcc) )		//0-125mv			125/2500*4096
+			{
+				au=16;	
+				a1=0;		   //a0,a1控制数字电位器
+				a0=0;
+				ADC0CF=0x84;
+	    	 }
+			 else if ( (0x0cc<=tobj_result_big_temp)&&(tobj_result_big_temp<0x199) )//125-250mv
+			{
+				au=8;	
+				a1=0;
+				a0=0;  
+				ADC0CF=0x83;
+			 }
+			else if ( (0x199<=tobj_result_big_temp)&&(tobj_result_big_temp<0x0333) )//250-500mv
+			{
+				au=4;	
+				a1=0;
+				a0=0;  
+				ADC0CF=0x82;
+			 }
+			else if ( (0x0333<=tobj_result_big_temp)&&(tobj_result_big_temp<0x0666) )//500-1000mv
+			{
+				au=2;	
+				a1=0;
+				a0=0;  
+				ADC0CF=0x81;
+			 }
+			else 
+			{
+				au=1;		
+				a1=0;
+				a0=0;
+				ADC0CF=0x80;
+			}
+			ADC0=0;							
+			tobj_accumulator_big=0L;	
+			shc_control=1;			//on						
+			for(i=0;i<2000;i++);	//等待时间>0.6ms
+			shc_control=0;	
+			//前置增益开关却换子程序,add
+			//开关打开
+			if (pre_gain_flag==1)		//模拟开关，大于6.5V，开关闭合
+			{
+				if ( tobj_result_big>0xbe2b )	//(6.5V*(2/7)/2.5V)*65535=0xbe2b
+				{
+				   	pre_gain_control=0;		//改变状态,开关闭合
+					pre_en=0;				//=0选通模拟开关，=1不选通
+					shc_control=0;
+					//延时15ms,等待继电器状态稳定
+					for(i=0;i<30000;i++);			//等待时间>15ms											
+					AMX0SL=0x01;
+					tobj_count_big=515;					
+				}
+				else if ( tobj_result_big<=0xbe2b )	//6.5V*(2/7)/2.5V)*65535		
+				{
+					pre_gain_control=1;		//保持状态
+					pre_en=1;
+				}
+			}
+			//开关闭合
+			else if (pre_gain_flag==0)	
+        	{
+				if (tobj_result_big>=0xea0)	//5.5V*(2/7)/2.5V/11)*65535=0xea0	
+				{
+					pre_gain_control=0;	//保持状态	
+					pre_en=0;
+				}
+				else if  (tobj_result_big<0xea0) 
+				{
+					pre_gain_control=1;		//改变状态
+					pre_en=1;
+					shc_control=0;
+					//延时15ms,等待继电器状态稳定
+					for(i=0;i<30000;i++);	//等待时间>15ms												
+					AMX0SL=0x01;
+					tobj_count_big=515;					
+				}	
+			}
+			pre_gain_flag=pre_gain_control;
+		}
+	  	else if (tobj_count_big==257)
+		{
+			shc_control=0;	
+			ADC0=0;
+			tobj_accumulator_big=0L;										
+		}
+   	  	else if(tobj_count_big==0)
+   	  	{
+			EA=0;
+			tobj_result_big=tobj_accumulator_big>>4;	
+			tobj_count_big=515;
+			//零点补偿
+			//read_par(); 
+			//par_buf=0x0400;
+
+			//单色温度	
+			// Vin=( V1C_OFFSET+(Tobj*EMISS_1C/EMISS_K_1C) ) *Au
+			// Vin为测量到的电压值;V1C_OFFSET为信号偏移；EMISS_K_1C为补偿小孔的差异，
+			//便于批量生产；EMISS_1C为单色发射率系数；Au为电路增益
+			//Tobj=(Vin/au-V1C_OFFSET)*EMISS_K_1C/EMISS_1C
+			if (tobj_result_big<0)
+			{
+				tobj_result_big=0;
+			}
+			tobj_real_one_temp=(uint)(tobj_result_big);
+		
+			//为检测低信号，如600度，此时测量到的信号是很低的。将单色信号的表格数据扩大100倍--pjl
+			if (pre_gain_flag==0)	//开关闭合
+			{
+			tobj_real_one_temp=tobj_real_one_temp*11;		//换算成开关未闭合的状态
+			}
+		/*	if ( (0x00<=tobj_real_one_temp)&&(tobj_real_one_temp<0x041) )			  //0-2.5mv
+			{
+			tobj_real_one_temp=tobj_real_one_temp*1000;				//000000000000
+			}
+			else if ( (0x41<=tobj_real_one_temp)&&(tobj_real_one_temp<0x020c) )		   //2.5-20mv
+			{
+			tobj_real_one_temp=tobj_real_one_temp*100;				//000000000000
+			}	
+			else if ( (0x020c<=tobj_real_one_temp)&&(tobj_real_one_temp<0x147a) )	  //20-200mv
+			{
+			tobj_real_one_temp=tobj_real_one_temp*10;				//000000000000
+			}	*/							
+		//	tobj_real_one_temp=tobj_real_one_temp*100;					  //0000000000
+			tobj_real_one_temp=tobj_real_one_temp/au;
+			if (par_buf[66]==1)//+
+			{
+				tobj_real_one_temp=tobj_real_one_temp+(par_buf[67]*100+par_buf[68]*10+par_buf[69]);
+			}
+			else if (par_buf[66]==0)//-
+			{
+				tobj_real_one_temp=tobj_real_one_temp-(par_buf[67]*100+par_buf[68]*10+par_buf[69]);
+			}
+			if (tobj_real_one_temp<=0)
+			{
+				tobj_real_one_temp=0;
+			}	
+			//tobj_real_one_temp=tobj_real_one_temp*EMISS_K_1C;
+			tobj_real_one_temp=tobj_real_one_temp*(par_buf[63]*100+par_buf[64]*10+par_buf[65]);
+			tobj_real_one_temp=tobj_real_one_temp/(par_buf[59]*100+par_buf[60]*10+par_buf[61]);					
+			if (tobj_real_one_temp<table_1c[0])		
+			{
+				tobj_real_one_temp=0;
+			}
+			if (tobj_real_one_temp>=table_1c[1000])						  //00000
+			{
+				tobj_real_one_temp=table_1c[1000]+0x01;					 //00000
+			}
+			tobj_real_one=tobj_real_one_temp;	
+
+			//双色零点补偿电压,为节省变量空间,用tambient_result替代zero_compensate
+			tambient_result=par_buf[33]*100+par_buf[34]*10+par_buf[35];
+			tambient_result=tambient_result*au;
+			tambient_result=(tambient_result*3)/40;		//*2*65535/(2500/7),.pjl_check
+			if (par_buf[32]==1)
+			{
+				tobj_result_big=tobj_result_big+tambient_result;
+			}
+			else if (par_buf[32]==0)
+			{
+				tobj_result_big=tobj_result_big-tambient_result;
+			}
+			//如果测出信号<0.14mv,考虑环境光等因素,显示600度,add_check
+			if ( tobj_result_big/au<=0x04 )
+			{
+				tobj_result_big=0;
+			}
+			tobj_result_big=tobj_result_big<<12;
+			tobj_result_temp=tobj_result_big;
+			//处理两个通道转换后的数据,将转换值*4096倍后再查表
+			tobj_accumulator_big=0L;
+			AMX0SL=0x00;
+			shc_control=0;
+			EA=1;
+   		}				
+	}
+	else if (AMX0SL==0x00)
+	{	
+		if (tobj_count_small==257)
+		{
+			ADC0=0;		//用于消除临近通道的转换干扰
+			for(i=0;i<2000;i++);	//等待时间>0.05ms
+			shc_control=0;
+			tobj_accumulator_small=0L;
+		}
+		else if (tobj_count_small!=257)
+		{
+		  	tobj_accumulator_small=tobj_accumulator_small+ADC0;
+		}
+		tobj_count_small--;
+   	  	if(tobj_count_small==0)
+   	  	{
+			EA=0;
+			tobj_count_small=257;
+			tobj_result_small=tobj_accumulator_small>>4;
+			tobj_accumulator_small=0L;	
+			tobj_result_temp=tobj_result_temp/tobj_result_small; 				 //大/小*4096	
+			if (tobj_result_temp>65530)
+			{
+				tobj_result_temp=0;
+			}
+			//求斜率系数
+	    	//read_par();            
+	  		//par_buf=0x0400;
+	  		WDTCN=0xa5;
+			//tobj_result_temp=tobj_result_temp*SLOPE_2C;
+			tobj_result_temp=tobj_result_temp*(par_buf[70]*1000+par_buf[71]*100+par_buf[72]*10+par_buf[73]);		  //00000000000
+			tobj_result_temp=tobj_result_temp/(par_buf[0]*1000+par_buf[1]*100+par_buf[2]*10+par_buf[57]);
+
+			if (tobj_result_temp>=two_color_end)
+			{
+				tobj_result_temp=two_color_end+0x01;
+			}			
+			if (par_buf[58]==2)	//双色模式
+			{
+				//tobj_real=(uint)(tobj_result_temp);
+				tobj_real=tobj_result_temp;
+				tc_low_enable();
+			}
+			else if (par_buf[58]==1)	//单色模式
+			{
+				tobj_real=tobj_real_one;	//add__check
+			}
+			sample_round=1;		//采样一个周期时间到				
+			/*
+			tobj_real_temp=(uint)(tobj_result_temp);
+			//连续采样3个数据,去掉最大值和最小值,其余值作平均
+			if (sum_count==0)	//初始化
+			{
+				sum=tobj_real_temp;
+				tobj_real_max=tobj_real_temp;
+				tobj_real_min=tobj_real_temp;
+			}
+			if ( (sum_count>0)&&(sum_count<3) )
+			{
+				if (tobj_real_temp>tobj_real_max)
+				{
+					tobj_real_max=tobj_real_temp;
+				}
+				else if (tobj_real_temp<tobj_real_min)
+				{
+				 	tobj_real_min=tobj_real_temp;
+				}
+				sum=sum+tobj_real_temp;
+			}
+			sum_count++;
+			if (sum_count==1)
+			{
+				sample_round=0;			//保证有足够的时间进行平均值运算
+			}
+			if (sum_count==3)
+			{
+				sum=sum-tobj_real_max-tobj_real_min;
+				tobj_real=(uint)(sum);
+				sum_count=0;
+				sample_round=1;		//采样一个周期时间到
+			}
+			*/
+			//read_par();
+			//par_buf=0x0400;
+			if (par_buf[3]!=3)
+			{
+				p_v_count++;
+				if (p_v_count>=10)
+				{
+					sample_count++;				//采样计数值加一
+					if (sample_count>9999)		//防止计数器溢出
+					{
+						sample_count=0;
+					}
+					p_v_count=0;
+				}		
+			}
+			else 
+			{
+				sample_count=0;
+				p_v_count=0;
+			}
+			au=1;
+			ADC0CF=0x80;
+			AMX0SL=0x02;	
+			shc_control=0;	
+			ES=1;		//串口允许	
+			if (ri_time_enable==1)
+			{
+				ri_time++;
+				if (ri_time>=2000)
+				{
+					ri_time=0;
+				}
+			}
+			str_count++;
+			if (str_count>=5)
+			{
+				str_enable=1;
+				str_count=0;
+			}
+			EA=1;				
+		}
+  	}
+}
+
+ 
+//采样模式
+void sample_state(void)
+{
+	//read_par(); 
+	//par_buf=0x0400;
+	sample_count_set=(par_buf[4]*100+par_buf[5]*10+par_buf[6])*10+par_buf[53];
+	if (par_buf[3]==1)		//peak
+	{
+		if (par_buf[58]==2)		//2c
+		{
+			tobj_temp_min=two_color_end;
+		}
+		else 
+		{
+			tobj_temp_min=table_1c[1000];						//0000000000
+		}	
+		sample_peak();
+	}
+	else if (par_buf[3]==2)	//vallery
+	{
+	 	if (par_buf[58]==2)
+		{
+			tobj_temp_max=two_color_start;
+		}
+		else
+		{
+			tobj_temp_max=table_1c[0];
+		}
+		sample_valley();	
+	}
+	else if (par_buf[3]==3)	//average
+	{
+		if (sample_count_set>600)	
+		{
+			sample_count_set=600;
+		}
+		if (par_buf[58]==2)	//2c
+		{
+			tobj_temp_min=two_color_end;
+			tobj_temp_max=two_color_start;
+		}
+		else 
+		{
+			tobj_temp_min=table_1c[1000];				 //00000000
+			tobj_temp_max=table_1c[0];
+		}
+		sample_average();
+	}
+}
+
+
+//峰值保持
+//(1)读键盘数据,设定范围为0-999s,当设定值为0s,峰值保持关闭,当设定值为999s,即为无限保持
+//(2)Treal与Ttemp_max比较,若Treal>Ttemp_max,将当前的实时值转为最大值。根据设定值采用
+//sample_count_start计数器,若Treal>Ttemp_max,将sample_count值清零,若Treal<Ttemp_max,
+//sample_count值不变,如果sample_count=max_count_set,将此时的最大值数据丢掉。
+//(3)根据当前的值,重新(2)的全过程。
+void sample_peak(void)
+{				
+	long tobj_real_temp;
+	if (sample_round==1)
+	{
+		tobj_real_temp=tobj_real;
+		if (sample_count_set==0)			//峰值保持模式关闭
+		{	
+			sample_count=0;
+			p_v_count=0;
+			tobj_result=tobj_real_temp;
+		}
+		else if (sample_count_set>=9990)	//无限保持
+		{
+			if(sample_count==0)		//初始值
+			{
+				if (p_v_count==0)
+				{
+					tobj_temp_max=tobj_real_temp;
+					tobj_result=tobj_temp_max;
+				}
+				else 
+				{
+					if (tobj_real_temp<=tobj_temp_max)
+					{
+						tobj_result=tobj_temp_max;
+					}
+					else if (tobj_real_temp>tobj_temp_max)
+					{					
+						sample_count=0;
+						p_v_count=0;
+						tobj_temp_max=tobj_real_temp;
+						tobj_result=tobj_temp_max;
+					}
+				}
+			}
+			else 
+			{
+				if (tobj_real_temp<=tobj_temp_max)
+				{
+					tobj_result=tobj_temp_max;
+				}
+				else if (tobj_real_temp>tobj_temp_max)
+				{
+					sample_count=0;
+					p_v_count=0;
+					tobj_temp_max=tobj_real_temp;
+					tobj_result=tobj_temp_max;
+				}
+			}
+		}
+		else 
+		{
+			if (sample_count==0)					//初始值
+			{
+				if (p_v_count==0)
+				{
+					tobj_temp_max=tobj_real_temp;
+					tobj_result=tobj_temp_max;
+				}
+				else 
+				{
+					if (tobj_real_temp<=tobj_temp_max)
+					{
+						tobj_result=tobj_temp_max;
+					}
+					else if (tobj_real_temp>tobj_temp_max)
+					{
+						sample_count=0;
+						p_v_count=0;
+						tobj_temp_max=tobj_real_temp;
+						tobj_result=tobj_temp_max;
+					}
+				}
+			}
+			else if (sample_count>0)
+			{
+				if (sample_count<sample_count_set)
+				{
+					if (tobj_real_temp<=tobj_temp_max)
+					{
+						tobj_result=tobj_temp_max;
+					}
+					else if (tobj_real_temp>tobj_temp_max)
+					{
+						sample_count=0;
+						p_v_count=0;
+						tobj_temp_max=tobj_real_temp;
+						tobj_result=tobj_temp_max;
+					}
+				}
+				else if (sample_count>=sample_count_set)
+				{
+					sample_count=0;
+					p_v_count=0;
+					tobj_temp_max=tobj_real_temp;
+					tobj_result=tobj_temp_max;
+				}	
+			}
+		}
+		sample_round=0;
+	}
+}
+			
+
+//谷值保持
+//(1)读键盘数据,设定范围为0-999s,当设定值为0s,谷值保持关闭,当设定值为999s,即为无限保持
+//(2)Treal与Ttemp_min比较,若Treal<Ttemp_min,将当前的实时值转为最小值。根据设定值采用
+//sample_count计数器,若Treal<Ttemp_min,将min_count_start值清零,若Treal>Ttemp_min,
+//将sample_count值不变(一个采样周期),如果sample_count=min_count_set,将此时的最小值数据丢掉。
+//(3)根据当前的值,重新(2)的全过程。
+void sample_valley(void)
+{	
+	long tobj_real_temp;
+	if (sample_round==1)
+	{			
+		tobj_real_temp=tobj_real;		
+		if (sample_count_set==0)				//谷值保持模式关闭    
+		{
+			sample_count=0;
+			p_v_count=0;
+			tobj_result=tobj_real_temp;
+		}
+		else if (sample_count_set>=9990)		//无限保持
+		{
+			if(sample_count==0)					//初始值
+			{
+				if (p_v_count==0)
+				{
+					tobj_temp_min=tobj_real_temp;
+					tobj_result=tobj_temp_min;
+				}
+				else 
+				{
+					if (tobj_real_temp>=tobj_temp_min)
+					{
+						tobj_result=tobj_temp_min;
+					}
+					else if (tobj_real_temp<tobj_temp_min)
+					{				
+						sample_count=0;
+						p_v_count=0;
+						tobj_temp_min=tobj_real_temp;
+						tobj_result=tobj_temp_min;
+					}
+				}
+			}
+			else 
+			{
+				if (tobj_real_temp>=tobj_temp_min)
+				{
+					tobj_result=tobj_temp_min;
+				}
+				else if (tobj_real_temp<tobj_temp_min)
+				{
+					sample_count=0;
+					p_v_count=0;
+					tobj_temp_min=tobj_real_temp;
+					tobj_result=tobj_temp_min;
+				}
+			}
+		}
+		else	 
+		{
+			if(sample_count==0)					//初始值
+			{
+				if (p_v_count==0)
+				{
+					tobj_temp_min=tobj_real_temp;
+					tobj_result=tobj_temp_min;
+				}
+				else 
+				{
+					if (tobj_real_temp>=tobj_temp_min)
+					{
+						tobj_result=tobj_temp_min;
+					}
+					else if (tobj_real_temp<tobj_temp_min)
+					{
+						sample_count=0;
+						p_v_count=0;
+						tobj_temp_min=tobj_real_temp;
+						tobj_result=tobj_temp_min;
+					}
+				}
+			}
+			else if (sample_count>0)
+			{
+				if (sample_count<sample_count_set)
+				{
+					if (tobj_real>=tobj_temp_min)
+					{
+						tobj_result=tobj_temp_min;
+					}
+					else if (tobj_real<tobj_temp_min)
+					{
+						sample_count=0;
+						p_v_count=0;
+						tobj_temp_min=tobj_real_temp;
+						tobj_result=tobj_temp_min;
+					}
+				}
+				else if (sample_count>=sample_count_set)
+				{
+					sample_count=0;
+					p_v_count=0;
+					tobj_temp_min=tobj_real_temp;
+					tobj_result=tobj_temp_min;
+				}
+			}
+		}
+		sample_round=0;
+	}
+}
+
+float xdata Yn_old=0;
+//平均值
+//(1)设定范围为0-60s,当设定值为0s,为实时采样模式。
+//(2)读键盘数据,决定采集的时间。采用一阶RC低通滤波器的算法
+//Yn=ac*Xn+(1-ac)*（Yn_old）；
+//Xn本次采样值；Yn本次滤波的输出值；Yn_old上次滤波的输出值；
+//ac=1-exp(-T/rc);T采样周期；RC滤波器时间常数；a滤波平滑系数	
+void sample_average(void)
+{
+	//EMI0CN=0x01;
+	//float xdata Yn_old;
+	//float xdata Yn_old_2c;
+	uint xdata rc;
+	float xdata ac;
+	float xdata Yn;
+	if (sample_round==1)
+	{
+		read_par(); 
+		//par_buf=0x0400;
+		rc=(par_buf[4]*100+par_buf[5]*10+par_buf[6])*10+par_buf[53];
+		if (rc>600)
+		{
+			rc=600;		//最大时间为60s
+		}
+		else if (rc==0)
+		{
+			ac=1;
+		}
+		//求滤波平滑系数
+		if (rc>0)		//防止除数溢出
+		{
+			ac=1-exp( -3/((float)(rc))  );
+		}
+		//Yn=a*Xn+(1-a)*Yn_old
+		Yn=ac*tobj_real;
+		ac=Yn+(1-ac)*Yn_old;
+		Yn_old=ac;	//保留上次滤波值
+		tobj_result=(long)(ac);
+		sample_round=0;	
+		p_v_count=0;	
+	}
+//	EMI0CN=0x00;
+}
+
+	
+					
+				
+//恒温控制,使探测器的温度恒定在40度左右
+void heat(void)
+{
+	if (tambient_result1>40)
+	{
+		heat_control=1;		//加热器关闭
+		//PCA0CPH0=0x05;		//98%
+	}
+	else
+	{
+		heat_control=0;	
+		//PCA0CPH0=0xfd;	//0.38
+	}
+}	
+
+
+//激光工作控制
+void laser(void)
+{
+	//read_par(); 
+	//par_buf=0x0400;
+	e=par_buf[31];
+	up_flag=e;
+	//当环境温度>50度时,激光自动关闭.
+	if (tambient_result1>50)
+	{
+		laser_control=1;
+	}
+	else if ( (tambient_result1<=50)&&(e==1)&&(laser_time_count>0) )
+	{
+		laser_control=0;
+	}
+	else 
+	{
+		laser_control=1;
+	}
+}
+
+
+void disp_laser_state(void)
+{
+	//read_par(); 
+	//par_buf=0x0400;
+	e=par_buf[31];
+	up_flag=e;
+	enter_flag=0;
+	do
+    { 	
+		disp_laser_state1();	  	
+		WDTCN=0xa5;
+	 }
+	while  (enter_flag==0); 
+	{   
+		EA=0;
+		key_flag_init();
+		//par_buf=0x0400;
+		par_buf[31]=e;
+		if (par_buf[31]==1)
+		{
+			laser_time_count=90000;
+		}
+		else 
+		{
+			laser_time_count=0;
+		}
+	    erase_par();
+		write_par();			//将修改好后的内容写入flash		
+		EA=1;
+	}
+}
+
+
+void disp_laser_state1(void)
+{
+	do
+	{ 
+		 WDTCN=0xa5;
+		 if (up_flag==1)
+		 {
+			e=1;
+			disp_laser_on();
+		  }
+		  else if (up_flag==0)
+		  {
+		  	e=0;	
+			disp_laser_off();
+		  }
+		  else if (up_flag>=2)
+		  {
+		  	e=0;
+			up_flag=0;
+			disp_laser_off();
+		  }	  
+	}
+      while ( enter_flag==0 );	 	
+}
+
+void disp_laser_state2(void)		//添加
+{
+ 	key_flag_init();
+	key_value=0x00;
+	laser_time_count=90000;
+}
+
+void disp_laser_on(void)
+{
+	x=1;
+	y=seg0[0];
+	send();
+	x=2;
+	y=seg0[19];
+	send();
+	x=3;
+	y=seg0[16];
+	send();
+	x=4;
+	y=seg0[16];
+	send();
+	x=5;
+	y=seg0[16];
+	send();
+}
+
+
+void disp_laser_off(void)
+{
+	x=1;
+	y=seg0[0];
+	send();
+	x=2;
+	y=seg0[15];
+	send();
+	x=3;
+	y=seg0[15];
+	send();
+	x=4;
+	y=seg0[16];
+	send();
+	x=5;
+	y=seg0[16];
+	send();
+}
+		
+//求环境温度值并显示
+//环境温度过高,过低报警.当Ta>70℃时,为保护线路板上元器件,尤其是激光管
+//组件,显示EHHH,当Ta<-10℃时,显示ELLL,指示目前环境温度过低.
+void tambient_disp(void)
+{
+	char data a,b,c;
+	int data temp;
+    //read_par(); 
+	//par_buf=0x0400;
+	c_f_flag=par_buf[36];
+	enter_flag=0;	
+	do{
+		 if (c_f_flag==0)
+		 {
+			a=tambient_result1/100;
+			b=(tambient_result1%100)/10;	
+			c=tambient_result1%10;
+			if (a==0)
+			{
+				a=16;
+			}
+		    if( (a==0)&&(b==0))
+			{
+				b=16;
+			}
+		    if ((tambient_result1>=0)&&tambient_disp_enable)
+			{
+				x=1;
+				y=seg0[16];
+				send();
+				x=2;
+				y=seg0[a];
+				send();
+				x=3;
+				y=seg0[b];
+				send();
+				x=4;
+				y=seg0[c];
+				send();
+				x=5;
+				y=seg0[17];
+				send();
+			}	
+  			else if ((tambient_result1<0)&&tambient_disp_enable)
+			{
+				a=-a;			//取绝对值
+				b=-b;
+				c=-c;
+				x=1;
+				y=seg0[16];
+				send();	
+				x=2;
+				y=seg0[18];
+				send();
+				x=3;
+				y=seg0[b];
+				send();
+				x=4;
+				y=seg0[c];
+				send();
+				x=5;
+				y=seg0[17];
+				send();
+			}
+		}
+	    else if (c_f_flag==1)//pjl
+		 {
+		 	temp=tambient_result1*18+320;
+			temp=temp/10;
+			a=temp/100;
+			b=(temp%100)/10;	
+			c=temp%10;
+			if (a==0)
+			{
+				a=16;
+			}
+			else if((a==0)&&(b==0))
+			{
+				b=16;
+			}
+		    if ((temp>=0)&&tambient_disp_enable)
+			{
+				x=1;
+				y=seg0[16];
+				send();
+				x=2;
+				y=seg0[a];
+				send();
+				x=3;
+				y=seg0[b];
+				send();
+				x=4;
+				y=seg0[c];
+				send();
+				x=5;
+				y=seg0[20];
+				send();
+			}	
+  			else if ((tambient_result1<0)&&tambient_disp_enable)
+			{
+				a=-a;			//取绝对值
+				b=-b;
+				c=-c;
+				x=1;
+				y=seg0[16];
+				send();	
+				x=2;
+				y=seg0[18];
+				send();
+				x=3;
+				y=seg0[b];
+				send();
+				x=4;
+				y=seg0[c];
+				send();
+				x=5;
+				y=seg0[20];
+				send();
+			}
+		}
+	    WDTCN=0xa5;
+	}
+	while(enter_flag==0);
+	{
+	   	key_flag_init();
+		tambient_disp_enable=0;
+	}
+}
+
+//温度报警显示
+void disp_tambient_alarm(void)
+{
+	char data temp;
+	if ( (find_key==0)&&(tambient_result1>70) )
+	{
+		tambient_alarm=1;
+		//EHHH
+		x=1;
+		y=seg0[14];
+		send();
+		x=2;
+		y=seg1[10];
+		send();
+		x=3;
+		y=seg1[10];
+		send();
+		x=4;
+		y=seg1[10];
+		send();
+		x=5;
+		y=seg0[16];
+		send();
+    	delay(1000);
+        x=1;
+	 	y=seg0[16];
+	    send();
+	    x=2;
+	    y=seg0[16];
+	    send();
+	    x=3;
+	    y=seg0[16];
+	    send();
+	    x=4;
+	    y=seg0[16];
+	    send();
+	    x=5;
+	    y=seg0[16];
+	    send();
+    	delay(1000);
+	}
+	if (tambient_result1<0)
+	{
+		temp=-tambient_result1;
+		if ( (find_key==0)&&(temp>10) )			  //调试  原10
+		{
+			tambient_alarm=1;
+			//ELLL
+			x=1;
+			y=seg0[14];
+			send();
+			x=2;
+			y=seg1[11];
+			send();
+			x=3;
+			y=seg1[11];
+			send();
+			x=4;
+			y=seg1[11];
+			send();
+			x=5;
+			y=seg0[16];
+			send();
+	    	delay(1000);
+		    x=1;
+	    	y=seg0[16];
+		    send();
+		    x=2;
+		    y=seg0[16];
+		    send();
+		    x=3;
+		    y=seg0[16];
+		    send();
+		    x=4;
+		    y=seg0[16];
+		    send();
+		    x=5;
+		    y=seg0[16];
+		    send();
+	    	delay(1000);
+		}
+	    if (temp<=10)
+		{
+			tambient_alarm=0;
+		}
+	}
+	else if (tambient_result1<=70)
+	{	
+		tambient_alarm=0;
+	}
+}
+
+
+
+int  data disp_value_temp;
+void tc_low_enable(void)
+{
+	//数据类型不能任意更改
+	uint data i;
+	ulong data temp;
+    float xdata two_color_temp;	
+
+	two_color_temp=tobj_real;
+	two_color_temp=two_color_temp/4096-two_color_b;
+	two_color_temp=two_color_temp/two_color_a;
+	disp_value_temp=(int)(two_color_temp);
+	//2C允许信号衰减的最大值，700C=30%，800C=80%，900C=90%，950C以上=95%(参考raytek-MR1S产品手册)
+	//按键设定范围=0%-100%，当值>95%时，显示“OFF”此功能关闭。
+	//判断2C输出是否允许，（当2C的温度值查表对应的1C信号）*（1-衰减设定值）>=(1C温度值查表对应的1C信号),
+	//2C有温度输出，否则2C显示最低温度	
+	i=par_buf[54]*100+par_buf[55]*10+par_buf[56];
+	if( (i<=95)&&(disp_value_temp>=700) )	
+	{
+		if (disp_value_temp>=1599)	//因为1650以上黑体炉不能测				   00000000000
+		{
+			temp=table_1c[1000];	//1c表中的最后一个数据					   0000000000000
+		}
+		else 
+		{
+			temp=table_1c[disp_value_temp-600];						 //800 2615
+		}
+		temp=( temp*(100-par_buf[55]*10-par_buf[56]) )/100;			 //2615*(100-80)/100=523	  删除 /100	表格放大100倍，现在不放大
+		if	(tobj_real_one<temp)
+		{
+			tobj_real=0;	//=0平均值模式下降太快
+		}	 
+	}
+
+	/*
+	temp=table_1c[0]/2;
+	if (tobj_real_one<temp)	//无信号时关闭
+	{
+		tobj_real=0;
+	}
+	*/
+}
+
+
+
+void display(void)
+{	
+	uint data  i;
+   	long idata temp;
+    uint idata ma_start,ma_end;
+	uint data dac1_value;
+	uint data oc_temp;
+	int data disp_value_1c,disp_value_2c;
+	long data tobj_result1;
+	float xdata two_color_temp;
+	//table=&table1[0];
+	//查表格显示测温值
+	tobj_result1=tobj_result;
+ 	if ( (find_key==0)&&(tambient_alarm==0) )  //没有键按下和没有温度报警
+	{ 
+		//单色温度
+		if (par_buf[58]==1)		//1C
+		{	
+			if (table_1c[0]>=tobj_result1)
+			{	
+				disp_value_1c=600;
+			}	
+			else if ( table_1c[1000]<=tobj_result1)	   //000000
+			{	
+				disp_value_1c=1600;					  //000000
+			}
+			else 
+			{	
+				//加快程序运行的速度		
+				if ( tobj_result1<=table_1c[100] )
+				{
+					oc_temp=0;
+				}
+				else if ( tobj_result1<=table_1c[200] )
+				{
+					oc_temp=100;
+				}
+				else if ( tobj_result1<=table_1c[300] )
+				{
+					oc_temp=200;
+				}
+				else if ( tobj_result1<=table_1c[400] )
+				{
+					oc_temp=300;
+				}
+				else if ( tobj_result1<=table_1c[500] )
+				{
+					oc_temp=400;
+				}
+				else if ( tobj_result1<=table_1c[600] )
+				{
+					oc_temp=500;
+				}
+				else if ( tobj_result1<=table_1c[700] )
+				{
+					oc_temp=600;
+				}
+				else if ( tobj_result1<=table_1c[800] )
+				{
+					oc_temp=700;
+				}
+				else if ( tobj_result1<=table_1c[900] )
+				{
+					oc_temp=800;
+				}
+				else if ( tobj_result1<=table_1c[1000] )
+				{
+					oc_temp=900;
+				}
+
+					for (i=oc_temp;i<(oc_temp+100);i++)
+					{
+			  			if ( (table_1c[i]<=tobj_result1)&&(table_1c[i+1]>=tobj_result1) )
+						{
+				    		disp_value_1c=i+600;		
+							break;
+						}
+					 }
+			}
+		}
+		//双色温度
+		if (par_buf[58]==2)//2c
+		{
+			if (two_color_start>=tobj_result1)
+			{	
+				disp_value_2c=600;
+			}
+			else
+			{
+				//two_color_temp=4096*(a*T+b);		
+				two_color_temp=tobj_result1;
+				two_color_temp=two_color_temp/4096-two_color_b;
+				two_color_temp=two_color_temp/two_color_a;
+				disp_value_2c=(int)(two_color_temp);			
+			}	
+		/*
+		if (disp_value_2c>=1600)	//防止误输出
+		{
+			 if (tobj_real_one<=table_1c[150])//750
+			 disp_value_2c=600;
+		}
+		*/
+		}
+		if (par_buf[58]==2)	//2c
+		{
+			disp_value=disp_value_2c;
+		}
+		else 	
+		{
+			disp_value=disp_value_1c;
+		}
+		display0();		
+		if (disp_value>600)
+		{
+			out_control=0;
+		}
+		else 
+		{
+			out_control=1;
+		}
+		//read_par();
+	    //par_buf=0x0400;
+    	ma_start=(par_buf[18]*100+par_buf[19]*10+par_buf[20])*10+par_buf[21];
+	    ma_end=(par_buf[22]*100+par_buf[23]*10+par_buf[24])*10+par_buf[25];		   
+		//DAC0=50-2050mv  
+		//DAC1=0-2V(4-20mA,ma_on_off=1)
+		//DAC1=0-2.5V(0-20mA,ma_on_off=0) 
+	/*	if (disp_value<=600)
+		{
+			DAC0=0x51;		//50mV
+			ma_on_off=1;
+			DAC1=0x00;		//0V
+		}	
+    	else if (disp_value<=ma_start)
+        {
+			DAC0=0x51;		//0V
+			ma_on_off=1;
+			DAC1=0x00;		//0V
+		}
+        else if (disp_value>=ma_end)
+        {
+            DAC0=0x0d1e;		//2050mV
+			ma_on_off=1;
+		    DAC1=0x0ccc;		//2V
+        }
+        else if ( (disp_value>ma_start)&&(disp_value<=ma_end) )
+        {
+		
+	        //DAC1 
+			temp=(disp_value-ma_start);
+	        temp=3276*temp;		 
+			temp=temp/(ma_end-ma_start);
+			dac0_value=(uint)(temp);
+	  		ma_on_off=1;
+			DAC1=dac0_value;
+			//DAC0  
+			dac0_value=dac0_value+0x51;
+			DAC0=dac0_value;
+		}		  */
+	  	if (disp_value<=600)						  //00000000000
+		{
+			DAC0=0x00;		//0V
+			temp=ILLL; //2500mV*655/VREF 初始化DAC1为0.4V
+            DAC1=(uint)(temp);   //取整数
+		}
+		else if (disp_value<=ma_start)
+        {
+			DAC0=0x00;		//0V
+			temp=ILLL;	//2500mV*655/VREF
+			DAC1=(uint)(temp);
+        }
+        else if (disp_value>=ma_end)
+        {
+            DAC0=0x0fff;		//4.096V
+			//DAC1  //2500mV*3276/VREF;/2V,20mA     				 
+			temp=IHHH;
+			dac1_value=(uint)(temp);
+			DAC1=dac1_value;
+        }
+        else if ( (disp_value>ma_start)&&(disp_value<=ma_end) )
+        {
+             //DAC0
+            // temp=ma_end-ma_start;
+			// temp=(disp_value-ma_start)/temp;
+            // temp=4095*temp;		 
+			// dac0_value=(uint)(temp);
+			// DAC0=dac0_value;
+			 //DAC1
+			 
+			 temp=(disp_value-ma_start);
+			 temp=(IHHH-ILLL)*temp; 
+	 	 	 temp=temp/(ma_end-ma_start);        				 
+			 temp=temp+ILLL;	//1637500=655*2500
+			 dac1_value=(uint)(temp);
+			 DAC1=dac1_value;
+			 
+		}
+
+
+
+	}	
+} 
+
+
+
+
+
+//led
+//此功能可用于防止继电器的抖动,死区是指在测温点附近的一个温度数值
+//区域(包括±),报警信号和继电器信号不改变工作状态。
+//初始值各状态关闭
+void alarm_state(void)
+{
+	int data alarm_over,alarm_over_vhh,alarm_over_vll,opt1;
+	int data alarm_low,alarm_low_vhh,alarm_low_vll;
+	long data alarm_over_dead_band,alarm_low_dead_band;
+	int dead_band;
+//	read_par();
+//	par_buf=0x0400;
+	opt1=par_buf[74];
+	alarm_over=(par_buf[7]*100+par_buf[8]*10+par_buf[9])*10+par_buf[10];
+	alarm_low=(par_buf[11]*100+par_buf[12]*10+par_buf[13])*10+par_buf[14];
+	dead_band=(par_buf[15]*100+par_buf[16]*10+par_buf[17])*10+par_buf[62];
+	alarm_over_dead_band=alarm_over;
+	alarm_over_dead_band=(alarm_over_dead_band*dead_band)/1000;
+	alarm_low_dead_band=alarm_low;
+	alarm_low_dead_band=(alarm_low_dead_band*dead_band)/1000;
+
+    alarm_over_vhh=(int)(alarm_over+alarm_over_dead_band);
+    alarm_over_vll=(int)(alarm_over-alarm_over_dead_band);
+    alarm_low_vhh=(int)(alarm_low+alarm_low_dead_band);
+    alarm_low_vll=(int)(alarm_low-alarm_low_dead_band);
+	//上限指示
+	if (opt1==1)
+  {
+	if ( (over1==1)&&(disp_value>alarm_over_vhh) )
+	{
+		over1=0;//改变状态
+		over=0;
+     }
+	else if ( (over1==1)&&(disp_value<=alarm_over_vhh) )
+	{
+		over1=1;//保持原状态
+		over=1;
+    }
+	else if ( (over1==0)&&(disp_value>=alarm_over_vll) )
+	{
+		over1=0;//保持原状态
+		over=0;
+    }		   
+	else if ( (over1==0)&&(disp_value<alarm_over_vll) )
+	{
+	    over1=1;//改变状态
+		over=1;
+    }
+ }
+	//下限指示
+  else if (opt1==2)
+ {
+	if ( (low1==1)&&(disp_value<alarm_low_vll) )
+	{
+		low1=0;//改变状态
+		over=0;
+     }
+	else if ( (low1==1)&&(disp_value>=alarm_low_vll) )
+	{
+		low1=1;//保持原状态
+		over=1;
+    }
+	else if ( (low1==0)&&(disp_value>=alarm_low_vhh) )
+	{
+		low1=1;//改变状态
+		over=1;
+    }
+	else if ( (low1==0)&&(disp_value<alarm_low_vhh) )
+	{
+	    low1=0;//保持原状态
+		over=0;
+    }
+ }
+	
+	if   (opt1==1)
+	{
+		low1=1;
+	}
+	else if   (opt1==2)
+	{
+		over1=1;
+	}
+	
+}
+
+//指示灯控制（峰值，谷值，平均值，上限，下限，双色）
+void led_state(void)
+{
+	//read_par(); 
+	//par_buf=0x0400;
+   	e=par_buf[3];
+	if (e==1)
+	{
+		peak_value=0;
+		average_value=1;
+		valley_value=1;
+	}
+	else if (e==2)
+	{
+		peak_value=1;
+		average_value=1;
+		valley_value=0;
+	}
+	else if (e==3)
+	{
+		peak_value=1;
+		average_value=0;
+		valley_value=1;
+	}
+	if (par_buf[58]==2)	//2c
+	{
+		oc_tc_led=0;
+	}
+	else 
+	{		
+		oc_tc_led=1;
+	}
+	//D7      D6      D5        D4       D3            D2             D1         D0
+	//DP      A       B         C         D            E              F           G
+	//0      over1  oc_tc_led   low1   peak_value   average_value  valley_value   0
+	over1=!over;
+	oc_tc_led=!oc_tc_led;
+	low1=!low1;
+	peak_value=!peak_value;
+	average_value=!average_value;
+	valley_value=!valley_value;
+	out_led7=0;
+	out_led0=0;
+	x=6;
+	y=out_led;
+	send();
+}
+	
+
+
+void display0(void)//pjl
+{
+	uchar data a,b,c,d;	
+	uint data temp;
+	uint data disp_value0;
+	if (tambient_alarm==0)
+	{
+		disp_value0=disp_value;
+	    //read_par(); 
+		//par_buf=0x0400;
+		c_f_flag=par_buf[36];		
+		if (c_f_flag==0)
+		{
+			temp=disp_value0;
+		}
+		else if (c_f_flag==1)
+		{
+			temp=disp_value0*18+320;
+			if (temp%10>=5)
+			{
+				temp=temp+10;
+			}
+			temp=temp/10;
+		}
+		a=temp/1000;
+		b=(temp%1000)/100;
+		c=(temp%100)/10;
+		d=temp%10;	
+		if (a==0)
+		{
+			a=16;
+		}
+		x=1;
+		y=seg0[a];
+		send();
+		x=2;
+		y=seg0[b];
+		send();
+		x=3;
+		y=seg0[c];
+		send();
+		x=4;
+		y=seg0[d];
+		send();
+		x=5;
+		if (c_f_flag==0)
+		{
+			y=seg0[17];
+		}
+		else if (c_f_flag==1)
+		{
+			y=seg0[20];
+		}
+		send();
+	}
+}
+
+	
+//-------------------------------------------------------------
+//disp.c
+//-------------------------------------------------------------
+void ini7219(void)
+{
+	x=9;			//译码方式
+	y=0;			//不译码
+	send();
+	x=0x0a;         //设置亮度寄存器
+	y=5;
+	send();
+	x=0x0b;         //设置扫描界线寄存器
+	y=5;			//显示六位
+	send();
+	x=0x0c;        	//设置掉电方式
+	y=1;            //正常操作
+	send();
+	x=0x0f;  		//设置显示方式
+	y=0;			//正常显示
+	send();	
+ }
+
+
+void disp0(void)
+{	
+    if (tambient_alarm==0)
+	{
+		//read_par();
+		//par_buf=0x0400;
+		c_f_flag=par_buf[36];
+	 	//显示600摄氏度
+		if (c_f_flag==0)
+		{
+	   		x=1;
+	 		y=seg0[16];
+			send();
+			x=2;
+			y=seg0[6];
+			send();
+			x=3;
+	    	y=seg0[0];
+			send();
+			x=4;
+			y=seg0[0];
+			send();
+			x=5;
+			y=seg0[17];
+			send();
+		}
+		//显示1112华氏度
+		else if (c_f_flag==1)
+		{
+			x=1;
+	 		y=seg0[1];
+			send();
+			x=2;
+			y=seg0[1];
+			send();
+			x=3;
+	    	y=seg0[1];
+			send();
+			x=4;
+			y=seg0[2];
+			send();
+			x=5;
+			y=seg0[20];
+			send();
+		}
+	}
+}
+
+void send(void)
+{
+	uchar data i;
+	txd=0;
+	max7219cs=0;
+	order=x;
+	for(i=0;i<8;i++)
+	{
+    	rxd=order7;
+		txd=1;	//10M操作
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+
+		order=order<<1;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+
+	}	
+	order=y;
+	for(i=0;i<8;i++)
+	{
+		rxd=order7;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+		txd=1;
+
+		order=order<<1;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+ 		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+		txd=0;
+
+	}		
+	max7219cs=1;
+	max7219cs=0;
+}
+
+//key
+void key_flag_init(void)
+{
+	function_flag=0;
+	up_flag=0;
+	shift_right_flag=0;
+	enter_flag=0;
+	up_shift_flag=0;	  //组合键
+
+}
+
+//T0初始化
+void timer10_init(void)
+{
+   TMOD=0x11;			//00010001,T0和T1工作在方式1,16位定时器
+   CKCON=0;				//timer0和timer1使用sysclk/12
+   ET0=0; 				//ET0=1;
+   //TCON|= 0x01;		//INT0下降沿中断
+   TH0=0xb7;//20ms定时,18432  （0xffff-0xb7ff）除以11.0592乘以12=20000
+   TL0=0xff;
+   TR0=1;
+   PT0=1;				//为默认优先级
+   //PX0=1;//INT0为最高优先级
+   //EX0=0;
+  // EIP2 = 0x01;		//定时器3溢出为高优先级
+
+}
+
+
+/////////////////////////////////////////////////////
+/*                   UART                         */
+/////////////////////////////////////////////////////
+void t2_init(void)    
+{
+	TH2 = 0xff;			//9600=0xff;   65536-（11059200/32/9600)=65500=FFDC
+	TL2 = 0xdc;			//9600=0xdc;
+	T2CON = 0x34;	   //00110100 T2为波特率发生器，开t2
+	RCAP2H = 0xff;		//重载波特率
+	RCAP2L = 0xdc;
+}
+
+void uart_init(void)
+{
+	SCON = 0x50;		//01010000方式1，8位UART可变波特率
+						//停止位的逻辑电平被忽视，允许UART接收
+	IP=0x00;			//PT2,PS,PT1,PX1,PT0,PX0为默认优先级
+	ES=0;
+	ri_time=0;
+	ri_time_enable=0;
+}
+
+//uart接收
+//uchar pdata receive[10];
+uchar pdata receive[15]={ ' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' '};
+uchar idata null=0;	//ENTER的位置
+char idata re_ref=-1;	//接收参考字符
+//bit send_enable=1;
+void uart(void) interrupt 4 using 3
+{
+	char idata i;
+	char idata re_pos;
+	if ( (RI==1)&&(find_key==0) )
+	{
+		send_enable=0;
+		WDTCN=0xa5;	
+		for(i=0;i<15;i++)
+		{
+			ri_time_enable=1;		//串口超时判断允许	
+			while ( RI==0 ) 
+			{
+				WDTCN = 0xa5;
+				if (ri_time>=200)//200
+				{
+					RI=1;
+				}
+			}
+			receive[i]=SBUF;
+			RI=0;
+			if(ri_time>=200)
+			{
+				ri_time=0;
+				ri_time_enable=0;
+				break;
+			}
+			if (receive[i]==0x0d)  //ENTER
+			{
+				ES=0;
+				null=i;
+				break;
+			} 
+			WDTCN=0xa5;
+		}
+		EA=0;
+	
+	
+		//SL[ENETER]/SLX.XX[ENTER] (SLOPE)
+		if ( (receive[0]=='S')&&(receive[1]=='L') )		
+		{	
+			sl();
+		}
+		//SM[ENTER]/SM(P,V,A)[ENTER] (SAMPLE MODE---Peak,Valley,Average)
+		else if ( (receive[0]=='S')&&(receive[1]=='M') )	
+		{
+			sm();
+		}		
+		//RT[ENTER]/RT(XXX)[ENTER]-----------Response Time
+		else  if ( (receive[0]=='R')&&(receive[1]=='T') )
+		{
+			rt();
+		}
+		else if ( (receive[0]=='D')&&(receive[1]=='M') )
+		{
+			dm();
+		}
+		else if ( (receive[0]=='L')&&(receive[1]=='U') )
+		{
+			if (receive[2]==0x0d)
+			{
+				re_ref=4;
+			}	
+			lu_ld_as_ae();
+			if (lu_ld_as_ae_enable==1)
+			{
+				re_ref=4;
+				//par_buf=0x0400;
+				par_buf[7]=e;
+				par_buf[8]=f;
+				par_buf[9]=g;
+				par_buf[10]=h;
+				par_buf[37]=e1;
+				par_buf[38]=f1;
+				par_buf[39]=g1;
+				par_buf[40]=h1;
+				EA=0;
+				//par_buf=0x0400;
+				erase_par();
+				write_par();	//将修改好后的内容写入flash	
+			}
+			lu_ld_as_ae_enable=0;
+		}
+		else if ( (receive[0]=='L')&&(receive[1]=='D') )
+		{
+			if (receive[2]==0x0d)
+			{
+				re_ref=5;
+			}	
+			lu_ld_as_ae();
+			if (lu_ld_as_ae_enable==1)
+			{
+				re_ref=5;
+				//par_buf=0x0400;
+				par_buf[11]=e;
+				par_buf[12]=f;
+				par_buf[13]=g;
+				par_buf[14]=h;
+				par_buf[41]=e1;
+				par_buf[42]=f1;
+				par_buf[43]=g1;
+				par_buf[44]=h1;
+				EA=0;
+				//par_buf=0x0400;
+				erase_par();
+				write_par();	//将修改好后的内容写入flash	
+			}
+			lu_ld_as_ae_enable=0;
+		}
+		else if ( (receive[0]=='A')&&(receive[1]=='S') )
+		{
+			if (receive[2]==0x0d)
+			{
+				re_ref=6;
+			}	
+			lu_ld_as_ae();
+			if (lu_ld_as_ae_enable==1)
+			{
+				re_ref=6;
+				//par_buf=0x0400;
+				par_buf[18]=e;
+				par_buf[19]=f;
+				par_buf[20]=g;
+				par_buf[21]=h;
+				par_buf[45]=e1;
+				par_buf[46]=f1;
+				par_buf[47]=g1;
+				par_buf[48]=h1;
+				EA=0;
+				//par_buf=0x0400;
+				erase_par();
+				write_par();	//将修改好后的内容写入flash	
+			}
+			lu_ld_as_ae_enable=0;
+		}
+		else if ( (receive[0]=='A')&&(receive[1]=='E') )
+		{
+			if (receive[2]==0x0d)
+			{
+				re_ref=7;
+			}	
+			lu_ld_as_ae();
+			if (lu_ld_as_ae_enable==1)
+			{
+				re_ref=7;
+				//par_buf=0x0400;
+				par_buf[22]=e;
+				par_buf[23]=f;
+				par_buf[24]=g;
+				par_buf[25]=h;
+				par_buf[49]=e1;
+				par_buf[50]=f1;
+				par_buf[51]=g1;
+				par_buf[52]=h1;
+				EA=0;
+				//par_buf=0x0400;
+				erase_par();
+				write_par();	//将修改好后的内容写入flash	
+			}
+			lu_ld_as_ae_enable=0;
+		}
+		else if ( (receive[0]=='L')&&(receive[1]=='O')&&(receive[2]==0x0d) )
+		{
+			re_ref=8;
+			//par_buf=0x0400;
+			par_buf[31]=1;
+			laser_time_count=90000;
+			EA=0;
+			//par_buf=0x0400;
+  			erase_par();
+			write_par();			//将修改好后的内容写入flag
+		}
+		else if ( (receive[0]=='L')&&(receive[1]=='F')&&(receive[2]==0x0d) )
+		{
+			re_ref=8;
+			//par_buf=0x0400;
+			par_buf[31]=0;
+			laser_time_count=0;
+			EA=0;
+			//par_buf=0x0400;
+  			erase_par();
+			write_par();			//将修改好后的内容写入flag
+		}		
+		else if ( (receive[0]=='P')&&(receive[1]=='A')&&(receive[2]==0x0d) )
+		{
+			re_ref=9;	//显示当前参数
+		}
+		else if ( (receive[0]=='P')&&(receive[1]=='R')&&(receive[2]==0x0d) )
+		{
+			re_ref=10;	//复位flash
+		}
+		else if ( (receive[0]=='D')&&(receive[1]=='B') )
+		{
+			db();
+		}
+		else if ( (receive[0]=='S')&&(receive[1]=='E') )		
+		{	
+			se();
+		}
+		else if ( (receive[0]=='D')&&(receive[1]=='T') )
+		{
+			dt();
+		}
+		else if ( (receive[0]==0x31)&&(receive[1]=='C')&&(receive[2]=='A')&&(receive[3]=='D')&&(receive[4]=='J') )
+		{
+			oc_adj();
+		}	
+		else if ( (receive[0]==0x31)&&(receive[1]=='C')&&(receive[2]=='Z')&&(receive[3]=='E')&&(receive[4]=='R')&&(receive[5]=='O') )
+		{
+			oc_zero();
+		}
+		else if ( (receive[0]==0x32)&&(receive[1]=='C')&&(receive[2]=='A')&&(receive[3]=='D')&&(receive[4]=='J') )
+		{
+			tc_adj();
+		}	
+		else 
+		{	
+			re_ref=-1;
+		}
+		re_pos=re_ref;
+		switch(re_pos)
+		{
+			case 0:	//SL双色斜率
+					SBUF='S';while (TI==0);TI=0;	//等待发送完毕后，TI=1,再清零发射中断标志TI=0
+					SBUF='L';while (TI==0);TI=0;
+					SBUF=par_buf[0]+0x30;while (TI==0);TI=0;
+					SBUF=0x2e;while (TI==0);TI=0;		//'.'
+					SBUF=par_buf[1]+0x30;while (TI==0);TI=0;
+					SBUF=par_buf[2]+0x30;while (TI==0);TI=0;
+					SBUF=par_buf[57]+0x30;while (TI==0);TI=0;
+					SBUF=0x0a;while (TI==0);TI=0; //ENTER
+					break;
+			case 1:	//SM测温模式设定
+					SBUF='S';while (TI==0);TI=0;
+					SBUF='M';while (TI==0);TI=0;
+					if (par_buf[3]==1) {SBUF='P';while (TI==0);TI=0;}
+					else if (par_buf[3]==2) {SBUF='V';while (TI==0);TI=0;}
+					else if (par_buf[3]==3) {SBUF='A';while (TI==0);TI=0;}
+					SBUF=0x0a;while (TI==0);TI=0; //ENTER
+					break;
+			case 2:	//RT测温模式时间
+					SBUF='R';while (TI==0);TI=0;
+					SBUF='T';while (TI==0);TI=0;
+					SBUF=par_buf[4]+0x30;while (TI==0);TI=0;
+					SBUF=par_buf[5]+0x30;while (TI==0);TI=0;
+					SBUF=par_buf[6]+0x30;while (TI==0);TI=0;
+					SBUF=0x2e;while (TI==0);TI=0;		//'.'
+					SBUF=par_buf[53]+0x30;while (TI==0);TI=0;
+					SBUF=0x0a;while (TI==0);TI=0; //Line Feed
+					break;
+			case 3:	//DM显示单位
+					SBUF='D';while (TI==0);TI=0;
+					SBUF='M';while (TI==0);TI=0;
+					if (par_buf[36]==0) {SBUF='C';while (TI==0);TI=0;}
+					else if (par_buf[36]==1) {SBUF='F';while (TI==0);TI=0;}	
+					SBUF=0x0a;while (TI==0);TI=0; //Line Feed
+					break;
+			case 4:	//LU上限报警
+					SBUF='L';while (TI==0);TI=0;
+					SBUF='U';while (TI==0);TI=0;
+					if (par_buf[36]==0)
+					{
+						SBUF=par_buf[7]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[8]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[9]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[10]+0x30;while (TI==0);TI=0;
+						SBUF='C';while (TI==0);TI=0;//Line Feed
+					}
+					else if (par_buf[36]==1)
+					{
+						SBUF=par_buf[37]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[38]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[39]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[40]+0x30;while (TI==0);TI=0;
+						SBUF='F';while (TI==0);TI=0;
+					}
+					SBUF=0x0a;while (TI==0);TI=0; //Line Feed
+					break;
+			case 5:	//LD下限报警
+					SBUF='L';while (TI==0);TI=0;
+					SBUF='D';while (TI==0);TI=0;
+					if (par_buf[36]==0)
+					{
+						SBUF=par_buf[11]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[12]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[13]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[14]+0x30;while (TI==0);TI=0;
+						SBUF='C';while (TI==0);TI=0;
+					}
+					else if (par_buf[36]==1)
+					{
+						SBUF=par_buf[41]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[42]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[43]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[44]+0x30;while (TI==0);TI=0;
+						SBUF='F';while (TI==0);TI=0;
+					}
+					SBUF=0x0a;while (TI==0);TI=0; //Line Feed
+					break;	
+			case 6:	//AS模拟量输出起始温度点
+					SBUF='A';while (TI==0);TI=0;
+					SBUF='S';while (TI==0);TI=0;
+					if (par_buf[36]==0)
+					{
+						SBUF=par_buf[18]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[19]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[20]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[21]+0x30;while (TI==0);TI=0;
+						SBUF='C';while (TI==0);TI=0;//Line Feed
+					}
+					else if (par_buf[36]==1)
+					{
+						SBUF=par_buf[45]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[46]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[47]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[48]+0x30;while (TI==0);TI=0;
+						SBUF='F';while (TI==0);TI=0;
+					}
+					SBUF=0x0a;while (TI==0);TI=0; //Line Feed
+					break;	
+			case 7:	//AE模拟量输出结束温度点
+					SBUF='A';while (TI==0);TI=0;
+					SBUF='E';while (TI==0);TI=0;
+					if (par_buf[36]==0)
+					{
+						SBUF=par_buf[22]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[23]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[24]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[25]+0x30;while (TI==0);TI=0;
+						SBUF='C';while (TI==0);TI=0;
+					}
+					else if (par_buf[36]==1)
+					{
+						SBUF=par_buf[49]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[50]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[51]+0x30;while (TI==0);TI=0;
+						SBUF=par_buf[52]+0x30;while (TI==0);TI=0;
+						SBUF='F';while (TI==0);TI=0;
+					}
+					SBUF=0x0a;while (TI==0);TI=0; 
+					break;	
+			case 8:	//LO激光开 LF激光关	
+					if (par_buf[31]==1)
+					{
+						SBUF='L';while (TI==0);TI=0;
+						SBUF='O';while (TI==0);TI=0;
+					}
+					else 
+					{
+						SBUF='L';while (TI==0);TI=0;
+						SBUF='F';while (TI==0);TI=0;
+					}
+					SBUF=0x0a;while (TI==0);TI=0; 
+					break;		
+			case 9:	//PA显示参数
+			    	disp_pa();
+					break;
+			case 10: //PR复位flash
+			        reset_pa();
+					break;	
+			case 11: //DB报警信号回差设置
+					SBUF='D';while (TI==0);TI=0;
+					SBUF='B';while (TI==0);TI=0;
+					SBUF=par_buf[15]+0x30;while (TI==0);TI=0;
+					SBUF=0x2e;while (TI==0);TI=0;	//'.'
+					SBUF=par_buf[16]+0x30;while (TI==0);TI=0;
+					SBUF=par_buf[17]+0x30;while (TI==0);TI=0;
+					SBUF=par_buf[62]+0x30;while (TI==0);TI=0;
+					SBUF=0x0a;while (TI==0);TI=0; 
+					break;
+			case 12://SE单色发射率
+					SBUF='S';while (TI==0);TI=0;
+					SBUF='E';while (TI==0);TI=0;
+					SBUF=par_buf[59]+0x30;while (TI==0);TI=0;
+					SBUF=0x2e;while (TI==0);TI=0;		//'.'
+					SBUF=par_buf[60]+0x30;while (TI==0);TI=0;
+					SBUF=par_buf[61]+0x30;while (TI==0);TI=0;
+					SBUF=0x0a;while (TI==0);TI=0; //ENTER
+					break;	
+			case 13://DT单色双色选择
+					SBUF='D';while (TI==0);TI=0;
+					SBUF='T';while (TI==0);TI=0;
+					SBUF=par_buf[58]+0x30;while (TI==0);TI=0;
+					SBUF='C';while (TI==0);TI=0;
+					SBUF=0x0a;while (TI==0);TI=0; //ENTER
+					break;	
+			case 14://1CADJ单色满度调节
+					SBUF=0x31;while (TI==0);TI=0;
+					SBUF='C';while (TI==0);TI=0;
+					SBUF='A';while (TI==0);TI=0;
+					SBUF='D';while (TI==0);TI=0;
+					SBUF='J';while (TI==0);TI=0;
+					SBUF=par_buf[63]+0x30;while (TI==0);TI=0;
+					SBUF=0x2e;while (TI==0);TI=0;	//'.'
+					SBUF=par_buf[64]+0x30;while (TI==0);TI=0;
+					SBUF=par_buf[65]+0x30;while (TI==0);TI=0;
+					SBUF=0x0a;while (TI==0);TI=0; //ENTER
+					break;
+			case 15://1CZERO单色零点补偿
+					SBUF=0x31;while (TI==0);TI=0;
+					SBUF='C';while (TI==0);TI=0;
+					SBUF='Z';while (TI==0);TI=0;
+					SBUF='E';while (TI==0);TI=0;
+					SBUF='R';while (TI==0);TI=0;
+					SBUF='O';while (TI==0);TI=0;
+					if (par_buf[66]==1)//+
+					{
+						SBUF=0x2b;while (TI==0);TI=0;
+					}
+					else if (par_buf[66]==0)//-
+					{
+						SBUF=0x2d;while (TI==0);TI=0;
+					}
+					SBUF=par_buf[67]+0x30;while (TI==0);TI=0;
+					SBUF=par_buf[68]+0x30;while (TI==0);TI=0;
+					SBUF=par_buf[69]+0x30;while (TI==0);TI=0;
+					SBUF=0x0a;while (TI==0);TI=0; //ENTER
+					break;									
+			 case 16:read_par();//2CADJ双色满度调节
+					SBUF=0x32;while (TI==0);TI=0;
+					SBUF='C';while (TI==0);TI=0;
+					SBUF='A';while (TI==0);TI=0;
+					SBUF='D';while (TI==0);TI=0;
+					SBUF='J';while (TI==0);TI=0;
+					SBUF=par_buf[70]+0x30;while (TI==0);TI=0;
+					SBUF=0x2e;while (TI==0);TI=0;	//'.'
+					SBUF=par_buf[71]+0x30;while (TI==0);TI=0;
+					SBUF=par_buf[72]+0x30;while (TI==0);TI=0;
+					SBUF=par_buf[73]+0x30;while (TI==0);TI=0;
+					SBUF=0x0a;while (TI==0);TI=0; //ENTER
+					break;													
+			default: re_ref=-1;break;
+		}	                  
+		//ri_time_enable=0;
+		//ri_time=0;
+		for(i=0;i<15;i++)
+		{
+			receive[i]=' ';
+		}
+		//ES=1;
+		EA=1;
+		null=0;
+		send_enable=1;
+	}
+}
+
+ /*
+//双色斜率
+void sl(void)
+{
+	int data temp;	
+	uchar data null_temp;
+	int data a,b,c,d;
+	null_temp=null;
+	if (null_temp==2)		//只要求显示发射率
+	{					
+		if (receive[2]==0x0d) 	   //0X0d = <CR>为回车键
+		{
+			re_ref=0;		//SL----SLOPE
+		}		
+	}
+	else if  ( null_temp==7)
+	{
+		if( (receive[3]=='.')&&(receive[2]>=0x30)&&(receive[2]<=0x31)&&(receive[4]>=0x30)&&(receive[4]<=0x39)&&(receive[5]>=0x30)&&(receive[5]<=0x39)&&(receive[6]>=0x30)&&(receive[6]<=0x39) )
+		{
+			receive[2]=receive[2]-0x30;
+			receive[4]=receive[4]-0x30;
+			receive[5]=receive[5]-0x30;
+			receive[6]=receive[6]-0x30;
+			re_ref=0;
+			//slope_range=temp;
+			a=receive[2];
+			b=receive[4];
+			c=receive[5];
+			d=receive[6];
+			temp=a*1000+b*100+c*10+d;
+			if ( (temp>=850)&&(temp<=1150))
+			{	
+				//par_buf=0x0400;
+				par_buf[0]=receive[2];
+				par_buf[1]=receive[4];
+				par_buf[2]=receive[5];
+				par_buf[57]=receive[6];
+				EA=0;
+				//par_buf=0x0400;
+				erase_par();
+				write_par();	//将修改好后的内容写入flash	
+			}
+	    }
+	}
+}
+
+//单色发射率
+void se(void)
+{
+	int data temp;	
+	uchar data null_temp;
+	int data a,b,c;
+	null_temp=null;
+	if (null_temp==2)		//只要求显示发射率
+	{					
+		if (receive[2]==0x0d) 	
+		{
+			re_ref=12;		//SE----emissivity
+		}		
+	}
+	else if  ( null_temp==6)
+	{
+		if( (receive[3]=='.')&&(receive[2]>=0x30)&&(receive[2]<=0x31)&&(receive[4]>=0x30)&&(receive[4]<=0x39)&&(receive[5]>=0x30)&&(receive[5]<=0x39) )
+		{
+			receive[2]=receive[2]-0x30;
+			receive[4]=receive[4]-0x30;
+			receive[5]=receive[5]-0x30;
+			a=receive[2];
+			b=receive[4];
+			c=receive[5];
+			re_ref=12;
+			//slope_range=temp;
+			temp=a*100+b*10+c;
+			if ( (temp>=10)&&(temp<=100))
+			{	
+				//par_buf=0x0400;
+				par_buf[59]=receive[2];
+				par_buf[60]=receive[4];
+				par_buf[61]=receive[5];
+				EA=0;
+				//par_buf=0x0400;
+				erase_par();
+				write_par();	//将修改好后的内容写入flash	
+			}
+	    }
+	}
+}
+
+
+
+//测温模式
+void sm(void)
+{	
+	uchar data null_temp;
+	null_temp=null;
+	if ( (null_temp==2)&&(receive[2]==0x0d) )	
+	{					
+		re_ref=1;		//SM
+	}
+	else if  (null_temp==3)
+	{
+		if ( (receive[2]=='P')||(receive[2]=='V')||(receive[2]=='A') )
+		{
+			re_ref=1;		//SM--P,V,A
+			//par_buf=0x0400;
+			if (receive[2]=='P')
+			{
+				par_buf[3]=1;
+			}
+			else if (receive[2]=='V')
+			{
+				par_buf[3]=2;
+			}
+			else if (receive[2]=='A')
+			{
+				par_buf[3]=3;
+			}
+			EA=0;
+			//par_buf=0x0400;
+			erase_par();
+			write_par();	//将修改好后的内容写入flash
+		}
+	}
+}
+
+//测温模式时间设定
+void rt(void)
+{
+	uchar data null_temp;
+	null_temp=null;
+	if ( null_temp==2 )			//只要求显示响应时间
+	{					
+		if (receive[2]==0x0d) 	
+		{
+			re_ref=2;		//RT
+		}
+	}
+	else if (null_temp==5)	//Example--RT1.0
+	{
+		if ( (receive[2]>=0x30)&&(receive[2]<=0x39)&&(receive[3]=='.')&&(receive[4]>=0x30)&&(receive[4]<=0x39) )
+		{
+			re_ref=2;
+			receive[2]=receive[2]-0x30;
+			receive[4]=receive[4]-0x30;
+			//par_buf=0x0400;
+			par_buf[4]=0;
+			par_buf[5]=0;
+			par_buf[6]=receive[2];
+			par_buf[53]=receive[4];
+			EA=0;
+			//par_buf=0x0400;
+			erase_par();
+			write_par();	//将修改好后的内容写入flash
+		}
+	}
+	else if (null_temp==6)	//Example--RT10.0
+	{
+		if ( (receive[2]>=0x30)&&(receive[2]<=0x39)&&(receive[3]>=0x30)&&(receive[3]<=0x39)&&(receive[4]=='.')&&(receive[5]>=0x30)&&(receive[5]<=0x39) )
+		{
+			re_ref=2;
+			receive[2]=receive[2]-0x30;
+			receive[3]=receive[3]-0x30;
+			receive[5]=receive[5]-0x30;
+			//par_buf=0x0400;
+			par_buf[4]=0;
+			par_buf[5]=receive[2];
+			par_buf[6]=receive[3];
+			par_buf[53]=receive[5];
+			EA=0;
+			erase_par();
+			write_par();	//将修改好后的内容写入flash
+		}
+	}
+	else if (null_temp==7)	//Example--RT100.0
+	{
+		if ( (receive[2]>=0x30)&&(receive[2]<=0x39)&&(receive[3]>=0x30)&&(receive[3]<=0x39)&&(receive[4]>=0x30)&&(receive[4]<=0x39)&&(receive[5]=='.')&&(receive[6]>=0x30)&&(receive[6]<=0x39) )
+		{
+			re_ref=2;
+			receive[2]=receive[2]-0x30;
+			receive[3]=receive[3]-0x30;
+			receive[4]=receive[4]-0x30;
+			receive[6]=receive[6]-0x30;
+			//par_buf=0x0400;
+			par_buf[4]=receive[2];
+			par_buf[5]=receive[3];
+			par_buf[6]=receive[4];
+			par_buf[53]=receive[6];
+			EA=0;
+			erase_par();
+			write_par();	//将修改好后的内容写入flash
+		}
+	}	
+}	
+
+//摄氏度华氏度显示切换
+void dm(void)
+{
+	uchar data null_temp;
+	null_temp=null;
+	if (null_temp==2)		//只要求显示出显示方式
+	{					
+		if (receive[2]==0x0d) 	
+		{
+			re_ref=3;		//RT
+		}
+	}
+	else if (null_temp==3)//Example--DMC/F
+	{			
+		if (receive[2]=='C')
+		{
+			re_ref=3;
+			//par_buf=0x0400;
+			par_buf[36]=0;	
+			EA=0;
+			erase_par();
+			write_par();	//将修改好后的内容写入flash
+		}
+		else if (receive[2]=='F')
+		{
+			re_ref=3;
+			//par_buf=0x0400;
+			par_buf[36]=1;	
+			EA=0;
+			erase_par();
+			write_par();	//将修改好后的内容写入flash
+		}
+	}
+}
+
+//单色双色选择
+void dt(void)
+{
+	uchar data null_temp;
+	null_temp=null;
+	if (null_temp==2)		//只要求显示出显示方式
+	{					
+		if (receive[2]==0x0d)
+		{
+			re_ref=13;		//DT
+		}
+	}
+	else if ( null_temp==4 )	//Example--DT1/2
+	{			
+		if ( (receive[2]==0x31)&&(receive[3]=='C') )
+		{
+			re_ref=13;
+			//par_buf=0x0400;
+			par_buf[58]=1;	
+			EA=0;
+			erase_par();
+			write_par();	//将修改好后的内容写入flash
+		}
+		else if ( (receive[2]==0x32)&&(receive[3]=='C') )
+		{
+			re_ref=13;
+			//par_buf=0x0400;
+			par_buf[58]=2;	
+			EA=0;
+			erase_par();
+			write_par();	//将修改好后的内容写入flash
+		}
+	}
+}
+
+void lu_ld_as_ae(void)
+{
+	uchar data null_temp;	 
+	uint data temp1_f,uart_value;
+	uchar data a,b,c,d;
+	WDTCN=0xa5;
+	null_temp=null;
+	//read_par(); 
+	//par_buf=0x0400;
+	c_f_flag=par_buf[36];
+    if (null_temp==6)//Example--LU600C
+	{			
+		if ( (receive[5]=='C')&&(c_f_flag==0) )
+		{
+			a=receive[2];
+			b=receive[3];
+			c=receive[4];
+			if ( (a>=0x30)&&(a<=0x39)&&(b>=0x30)&&(b<=0x39)&&(c>=0x30)&&(c<=0x39) )
+			{
+				a=a-0x30;
+				b=b-0x30;
+				c=c-0x30;
+				uart_value=a*100+b*10+c;
+				if ( (uart_value>=0)&&(uart_value<=2000) )
+				{
+					e=0;
+					f=a;
+					g=b;
+					h=c;
+					temp1_f=uart_value*18+320;
+					if (temp1_f%10>=5)
+					{
+						temp1_f=temp1_f+10;
+					}
+					temp1_f=temp1_f/10;		
+					e1=temp1_f/1000;
+					f1=(temp1_f%1000)/100;
+					g1=(temp1_f%100)/10;
+					h1=temp1_f%10;
+					lu_ld_as_ae_enable=1;												
+				}
+			}
+		}
+	}
+    else if (null_temp==7)//Example--LU1600C/F
+	{			
+		if ( (receive[6]=='C')&&(c_f_flag==0) )
+		{
+			a=receive[2];
+			b=receive[3];
+			c=receive[4];
+			d=receive[5];
+			if ( (a>=0x30)&&(a<=0x31)&&(b>=0x30)&&(b<=0x39)&&(c>=0x30)&&(c<=0x39)&&(d>=0x30)&&(d<=0x39) )
+			{
+				a=a-0x30;
+				b=b-0x30;
+				c=c-0x30;
+				d=d-0x30;
+				if (a==0)
+				{
+					uart_value=b*100+c*10+d;
+				}
+				else if (a==1)
+				{
+					uart_value=1000+b*100+c*10+d;
+				}	
+				else 
+				{
+					uart_value=0;
+				}				
+				if ( (uart_value>=0)&&(uart_value<=2000) )
+				{	
+					e=a;
+					f=b;
+					g=c;
+					h=d;
+					temp1_f=uart_value*18+320;
+					if (temp1_f%10>=5)
+					{
+						temp1_f=temp1_f+10;
+					}
+					temp1_f=temp1_f/10;		
+					e1=temp1_f/1000;
+					f1=(temp1_f%1000)/100;
+					g1=(temp1_f%100)/10;
+					h1=temp1_f%10;
+					lu_ld_as_ae_enable=1;												
+				}
+			}
+		}
+		else if ( (receive[6]=='F')&&(c_f_flag==1) )
+		{
+			a=receive[2];
+			b=receive[3];
+			c=receive[4];
+			d=receive[5];
+			if ( (a>=0x31)&&(a<=0x32)&&(b>=0x30)&&(b<=0x39)&&(c>=0x30)&&(c<=0x39)&&(d>=0x30)&&(d<=0x39) )
+			{
+				a=a-0x30;
+				b=b-0x30;
+				c=c-0x30;
+				d=d-0x30;
+				if (a==1)
+				{
+					uart_value=1000+b*100+c*10+d;
+				}	
+				else if (a==2)
+				{
+					uart_value=2000+b*100+c*10+d;
+				}
+				else 
+				{
+					uart_value=0;
+				}									
+				if ( (uart_value>=0)&&(uart_value<=3632) )
+				{
+					e1=a;
+					f1=b;
+					g1=c;
+					h1=d;
+					temp1_f=(uart_value*10-320)/18;
+					e=temp1_f/1000;
+					f=(temp1_f%1000)/100;
+					g=(temp1_f%100)/10;
+					h=temp1_f%10;
+					lu_ld_as_ae_enable=1;												
+				}
+			}
+		}
+	}
+}
+
+//DB报警信号回差设置
+void db(void)
+{
+	int data temp;	
+	uchar data null_temp;
+	null_temp=null;
+	if (null_temp==2)		//只要求显示死区
+	{					
+		re_ref=11;		//DB0.00
+	}
+	else if  ( (null_temp==7)&&(receive[3]=='.') )
+	{
+		receive[2]=receive[2]-0x30;
+		receive[4]=receive[4]-0x30;
+		receive[5]=receive[5]-0x30;
+		receive[6]=receive[6]-0x30;
+		re_ref=11;
+		temp=receive[2]*1000+receive[4]*100+receive[5]*10+receive[6];
+		if ( (temp>=0)&&(temp<=500))
+		{	
+			//par_buf=0x0400;
+			par_buf[15]=receive[2];
+			par_buf[16]=receive[4];
+			par_buf[17]=receive[5];
+			par_buf[62]=receive[6];
+			EA=0;
+			//par_buf=0x0400;
+			erase_par();
+			write_par();	//将修改好后的内容写入flash	
+		}
+    }
+}
+
+
+void disp_pa(void)
+{
+	//read_par();
+	//par_buf=0x0400;
+	//DT 1C OR 2C,SL OR SE
+	if (par_buf[58]==2)
+	{
+		SBUF='D';while (TI==0);TI=0;
+		SBUF='T';while (TI==0);TI=0;
+		SBUF=0x32;while (TI==0);TI=0;
+		SBUF='C';while (TI==0);TI=0;
+		SBUF=0x0a;while (TI==0);TI=0; //Line Feed
+
+		SBUF='S';while (TI==0);TI=0;
+		SBUF='L';while (TI==0);TI=0;
+		SBUF=par_buf[0]+0x30;while (TI==0);TI=0;
+		SBUF=0x2e;while (TI==0);TI=0;		//'.'
+		SBUF=par_buf[1]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[2]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[57]+0x30;while (TI==0);TI=0;
+		SBUF=0x0a;while (TI==0);TI=0; //Line Feed
+	}
+	else if (par_buf[58]==1)
+	{
+		SBUF='D';while (TI==0);TI=0;
+		SBUF='T';while (TI==0);TI=0;
+		SBUF=0x31;while (TI==0);TI=0;
+		SBUF='C';while (TI==0);TI=0;
+		SBUF=0x0a;while (TI==0);TI=0; //Line Feed
+
+		SBUF='S';while (TI==0);TI=0;
+		SBUF='E';while (TI==0);TI=0;
+		SBUF=par_buf[59]+0x30;while (TI==0);TI=0;
+		SBUF=0x2e;while (TI==0);TI=0;		//'.'
+		SBUF=par_buf[60]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[61]+0x30;while (TI==0);TI=0;
+		SBUF=0x0a;while (TI==0);TI=0; //Line Feed
+	}
+	//Sample mode
+	SBUF='S';while (TI==0);TI=0;
+	SBUF='M';while (TI==0);TI=0;
+	if (par_buf[3]==1) {SBUF='P';while (TI==0);TI=0;}
+	else if (par_buf[3]==2) {SBUF='V';while (TI==0);TI=0;}
+	else if (par_buf[3]==3) {SBUF='A';while (TI==0);TI=0;}
+	SBUF=0x0a;while (TI==0);TI=0;
+	//Response time
+	SBUF='R';while (TI==0);TI=0;
+	SBUF='T';while (TI==0);TI=0;
+	SBUF=par_buf[4]+0x30;while (TI==0);TI=0;
+	SBUF=par_buf[5]+0x30;while (TI==0);TI=0;
+	SBUF=par_buf[6]+0x30;while (TI==0);TI=0;
+	SBUF=0x2e;while (TI==0);TI=0;		//'.'
+	SBUF=par_buf[53]+0x30;while (TI==0);TI=0;	
+	SBUF='s';while (TI==0);TI=0;		
+	SBUF=0x0a;while (TI==0);TI=0; 
+	//Limit up
+	SBUF='L';while (TI==0);TI=0;
+	SBUF='U';while (TI==0);TI=0;
+	if (par_buf[36]==0)
+	{
+		SBUF=par_buf[7]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[8]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[9]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[10]+0x30;while (TI==0);TI=0;
+		SBUF='C';while (TI==0);TI=0;
+	}
+	else if (par_buf[36]==1)
+	{
+		SBUF=par_buf[37]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[38]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[39]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[40]+0x30;while (TI==0);TI=0;
+		SBUF='F';while (TI==0);TI=0;
+	}
+	SBUF=0x0a;while (TI==0);TI=0; 
+	//Limit Down
+	SBUF='L';while (TI==0);TI=0;
+	SBUF='D';while (TI==0);TI=0;
+	if (par_buf[36]==0)
+	{
+		SBUF=par_buf[11]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[12]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[13]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[14]+0x30;while (TI==0);TI=0;
+		SBUF='C';while (TI==0);TI=0;
+	}
+	else if (par_buf[36]==1)
+	{
+		SBUF=par_buf[41]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[42]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[43]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[44]+0x30;while (TI==0);TI=0;
+		SBUF='F';while (TI==0);TI=0;
+	}
+	SBUF=0x0a;while (TI==0);TI=0; 
+	//Dead Band
+	SBUF='D';while (TI==0);TI=0;
+	SBUF='B';while (TI==0);TI=0;
+	SBUF=par_buf[15]+0x30;while (TI==0);TI=0;
+	SBUF=0x2e;while (TI==0);TI=0;	//'.'
+	SBUF=par_buf[16]+0x30;while (TI==0);TI=0;
+	SBUF=par_buf[17]+0x30;while (TI==0);TI=0;
+	SBUF=par_buf[62]+0x30;while (TI==0);TI=0;
+	SBUF=0x0a;while (TI==0);TI=0;	
+	//Laser State
+	if (par_buf[31]==1)
+	{
+		SBUF='L';while (TI==0);TI=0;
+		SBUF='O';while (TI==0);TI=0;
+	}
+	else 
+	{
+		SBUF='L';while (TI==0);TI=0;
+		SBUF='F';while (TI==0);TI=0;
+	}
+	SBUF=0x0a;while (TI==0);TI=0; 
+	//Display Mode
+	SBUF='D';while (TI==0);TI=0;
+	SBUF='M';while (TI==0);TI=0;
+	if (par_buf[36]==0) {SBUF='C';while (TI==0);TI=0;}
+	else if (par_buf[36]==1) {SBUF='F';while (TI==0);TI=0;}	
+	SBUF=0x0a;while (TI==0);TI=0; 
+	//Analog Start
+	SBUF='A';while (TI==0);TI=0;
+	SBUF='S';while (TI==0);TI=0;
+	if (par_buf[36]==0)
+	{
+		SBUF=par_buf[18]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[19]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[20]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[21]+0x30;while (TI==0);TI=0;
+		SBUF='C';while (TI==0);TI=0;
+	}
+	else if (par_buf[36]==1)
+	{
+		SBUF=par_buf[45]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[46]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[47]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[48]+0x30;while (TI==0);TI=0;
+		SBUF='F';while (TI==0);TI=0;
+	}
+	SBUF=0x0a;while (TI==0);TI=0; 
+	//Analog End	
+	SBUF='A';while (TI==0);TI=0;
+	SBUF='E';while (TI==0);TI=0;
+	if (par_buf[36]==0)
+	{
+		SBUF=par_buf[22]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[23]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[24]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[25]+0x30;while (TI==0);TI=0;
+		SBUF='C';while (TI==0);TI=0;
+	}
+	else if (par_buf[36]==1)
+	{
+		SBUF=par_buf[49]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[50]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[51]+0x30;while (TI==0);TI=0;
+		SBUF=par_buf[52]+0x30;while (TI==0);TI=0;
+		SBUF='F';while (TI==0);TI=0;
+	}
+	SBUF=0x0a;while (TI==0);TI=0; 				
+}
+
+void reset_pa(void)
+{
+	EA=0;
+	erase_par();
+	init_par();
+	laser_time_count=90000;			  //25510
+	disp_pa();								
+}
+
+
+/*	
+void str(void)
+{
+	uchar data cf;
+	uint data disp_value0;
+	uchar idata a,b,c,d;
+	uint data temp;
+	int data tambient_result1_temp;
+	ulong data real_out;
+	uint data real_out_temp;
+	uchar buff;
+	if ( (str_enable==1)&&(find_key==0)&&(send_enable==1) )
+	{	
+		ES=0;
+		str_enable=0;
+		//read_par();
+		//par_buf=0x0400;
+		c_f_flag=par_buf[36];
+		disp_value0=disp_value;
+		if (c_f_flag==0)
+		{
+			cf='C';
+			temp=disp_value0;
+		}
+		else if (c_f_flag==1)
+		{	
+			cf='F';
+			temp=disp_value0*18+320;
+			buff=temp%10;
+			if (buff>=5)
+			{
+				temp=temp+10;
+			}
+			temp=temp/10;       		
+		}
+		a=temp/1000+0x30;
+		b=(temp%1000)/100+0x30;
+		c=(temp%100)/10+0x30;
+		d=temp%10+0x30;	
+		tambient_result1_temp=tambient_result1;
+		if (tambient_result1>70) 	//EEE1
+		{
+			a='E';
+			b='E';
+			c='E';
+			d=0x31;
+		}
+		else if (tambient_result1<0)
+		{
+			tambient_result1_temp=-tambient_result1;
+			if (tambient_result1_temp>10)
+			{
+				a='E';
+				b='E';
+				c='E';
+				d=0x32;
+			}
+		}
+		//ES=0;
+		SBUF=a;while (TI==0);TI=0;
+		SBUF=b;while (TI==0);TI=0;
+		SBUF=c;while (TI==0);TI=0;
+		SBUF=d;while (TI==0);TI=0;
+		SBUF=cf;while (TI==0);TI=0; //℃or℉
+		SBUF=0x0a;while (TI==0);TI=0; 
+
+		sample_average();
+		real_out=tobj_result;
+		real_out=real_out*1000;
+		real_out=real_out>>12;
+		real_out_temp=(uint)(real_out);
+		SBUF=0x32;while (TI==0);TI=0;
+		SBUF='C';while (TI==0);TI=0;
+		SBUF=real_out_temp/1000+0x30;while (TI==0);TI=0;
+		SBUF=(real_out_temp%1000)/100+0x30;while (TI==0);TI=0;
+		SBUF=(real_out_temp%100)/10+0x30;while (TI==0);TI=0;
+		SBUF=real_out_temp%10+0x30;while (TI==0);TI=0;
+		SBUF=0x0a;while (TI==0);TI=0; 
+
+		SBUF=0x31;while (TI==0);TI=0;
+		SBUF='C';while (TI==0);TI=0;
+		SBUF=tobj_real_one/10000+0x30;while (TI==0);TI=0;
+		SBUF=(tobj_real_one%10000)/1000+0x30;while (TI==0);TI=0;
+		SBUF=(tobj_real_one%1000)/100+0x30;while (TI==0);TI=0;
+		SBUF=(tobj_real_one%100)/10+0x30;while (TI==0);TI=0;
+		SBUF=(tobj_real_one%10)/10+0x30;while (TI==0);TI=0;
+		SBUF=0x0a;while (TI==0);TI=0; 
+		ES=1;
+	}
+}
+*/
+	
+void str(void)
+{
+	uchar idata cf;
+	uint data disp_value0;
+	uchar idata a,b,c,d;
+	uint data temp;
+	int idata tambient_result1_temp;
+	uchar buff;
+	if ( (str_enable==1)&&(find_key==0)&&(send_enable==1) )
+	{	
+		ES=0;
+		str_enable=0;
+		//read_par();
+		//par_buf=0x0400;
+		c_f_flag=par_buf[36];
+		disp_value0=disp_value;
+		if (c_f_flag==0)
+		{
+			cf='C';
+			a=disp_value0/1000;
+			b=(disp_value0%1000)/100;
+		    c=(disp_value0%100)/10;
+			d=disp_value0%10;
+		}
+		else if (c_f_flag==1)
+		{	
+			cf='F';
+			temp=disp_value0*18+320;
+			buff=temp%10;
+			if (buff>=5)
+			{
+				temp=temp+10;
+			}
+			temp=temp/10;
+			a=temp/1000;
+			b=(temp%1000)/100;
+		    c=(temp%100)/10;
+			d=temp%10;	
+		}
+		a=a+0x30;
+		b=b+0x30;
+		c=c+0x30;
+		d=d+0x30;
+		tambient_result1_temp=tambient_result1;
+		if (tambient_result1>70) 	//EEE1
+		{
+			a='E';
+			b='E';
+			c='E';
+			d=0x31;
+		}
+		else if (tambient_result1<0)
+		{
+			tambient_result1_temp=-tambient_result1;
+			if (tambient_result1_temp>10)
+			{
+				a='E';
+				b='E';
+				c='E';
+				d=0x32;
+			}
+		}
+		//ES=0;
+		SBUF=a;while (TI==0);TI=0;
+		SBUF=b;while (TI==0);TI=0;
+		SBUF=c;while (TI==0);TI=0;
+		SBUF=d;while (TI==0);TI=0;
+		SBUF=cf;while (TI==0);TI=0; //℃or℉
+		SBUF=0x0a;while (TI==0);TI=0; 
+		ES=1;
+	}
+}
+
+
+void oc_adj(void)
+{	
+	uchar data null_temp;
+	uchar a,b,c;
+	null_temp=null;	
+	if (null_temp==5)		//只要求显示发射率
+	{					
+		if (receive[5]==0x0d) 	
+		{
+			re_ref=14;		//1CADJ
+		}		
+	}
+	else if  ( null_temp==9)//1CADJ1.00	
+	{
+		a=receive[5]-0x30;
+		b=receive[7]-0x30;
+		c=receive[8]-0x30;
+		if( (receive[6]=='.')&&(a>=0)&&(a<=9)&&(b>=0)&&(b<=9)&&(c>=0)&&(c<=9) )
+		{
+			re_ref=14;
+			par_buf[63]=a;
+			par_buf[64]=b;
+			par_buf[65]=c;	
+			EA=0;
+			//par_buf=0x0400;
+			erase_par();
+			write_par();	//将修改好后的内容写入flash	
+	    }
+	}
+}
+
+
+void oc_zero(void)
+{	
+	uchar data null_temp;
+	uchar a,b,c;
+	null_temp=null;	
+	if (null_temp==6)		//只要求显示发射率
+	{					
+		if (receive[6]==0x0d) 	
+		{
+			re_ref=15;		//1CZERO
+		}		
+	}
+	else if  ( null_temp==10)//1CZERO+000(-000)
+	{
+		a=receive[7]-0x30;
+		b=receive[8]-0x30;
+		c=receive[9]-0x30;
+		if( ((receive[6]==0x2d)||(receive[6]==0x2b))&&(a>=0)&&(a<=9)&&(b>=0)&&(b<=9)&&(c>=0)&&(c<=9) )
+		{
+			re_ref=15;
+			if (receive[6]==0x2d)//-
+			{
+				par_buf[66]=0;
+			}
+			else  if (receive[6]==0x2b)//+
+			{
+				par_buf[66]=1;
+			}
+			par_buf[67]=a;
+			par_buf[68]=b;
+			par_buf[69]=c;	
+			EA=0;
+			//par_buf=0x0400;
+			erase_par();
+			write_par();	//将修改好后的内容写入flash	
+	    }
+	}
+}
+
+
+void tc_adj(void)
+{	
+	uchar data null_temp;
+	uchar a,b,c,d;
+	null_temp=null;	
+	if (null_temp==5)		//只要求显示射率
+	{					
+		if (receive[5]==0x0d) 	
+		{
+			re_ref=16;		//2CADJ
+		}		
+	}
+	else if  ( null_temp==10)//2CADJ1.000	
+	{
+		a=receive[5]-0x30;
+		b=receive[7]-0x30;
+		c=receive[8]-0x30;
+		d=receive[9]-0x30;
+		if( (receive[6]=='.')&&(a>=0)&&(a<=9)&&(b>=0)&&(b<=9)&&(c>=0)&&(c<=9)&&(d>=0)&&(d<=9) )
+		{
+			re_ref=16;
+			par_buf[70]=a;
+			par_buf[71]=b;
+			par_buf[72]=c;			
+			par_buf[73]=d;
+			EA=0;
+			//par_buf=0x0400;
+			erase_par();
+			write_par();	//将修改好后的内容写入flash	
+	    }
+	}
+}
+
+
+
+//键盘扫描子函数
+void timer0_isr(void) interrupt 1 using 2
+{
+   uchar data key_value_temp;
+   key_value_temp=(~P1)&0x0f;
+   if (key_value_temp!=0)
+   {
+       delay(200);
+       WDTCN=0xa5;
+       key_value_temp=(~P1)&0x0f;
+	   if (key_value_temp==0x01)  
+	   {  
+	      function_flag++;
+		  if (function_flag==14)
+		  {
+		     function_flag=1;
+		   }
+		  do{ WDTCN=0xa5;}
+		  while (function==0);
+		  delay(250);
+	   }  
+     else if (key_value_temp==0x04) 
+	 { 
+		 up_flag++;
+		 if (up_flag==10)
+		 {
+		 	up_flag=0;
+         }
+	     do{ WDTCN=0xa5;}
+		 while (up==0);
+		 delay(200);
+      }
+	  else if (key_value_temp==0x02)
+	  {
+		 shift_right_flag++;
+		 if (shift_right_flag==5)
+		 {
+		 	shift_right_flag=1;
+          }
+	     do{ WDTCN=0xa5;}
+		 while (shift_right==0);
+		 delay(200);
+	   }
+	  else if (key_value_temp==0x08) 
+      { 
+		    enter_flag=1;
+		    do{ WDTCN=0xa5;}
+		    while (enter==0);
+		    delay(200);
+	  } 
+  	  else if (key_value_temp==0x0e)  //00001110组合键键操作，2/3/4三个键同时按
+  	  {  	up_shift_flag=1;
+ 			function_flag=15;
+			 do{ WDTCN=0xa5;}
+		    while (up_shift_flag==0);
+		    delay(200);
+      }
+	  key_value=key_value_temp; 
+   }
+  if (laser_time_count>0)
+   {
+  		laser_time_count--;
+		if (laser_time_count==0)
+		{
+			//par_buf=0x0400;
+			par_buf[31]=1;								 //激光开启后，延时30分钟后，激光熄灭，1为ON开关不变，改为0，ON变成OFF
+			EA=0;
+		    erase_par();
+			write_par();	//将修改好后的内容写入flash
+			EA=1;
+		}
+	}
+	//heat();			//防止读数时应探测器过热而损坏。
+   	TH0=0xb8;		//20ms定时重载65536-18432	
+  	TL0=0x00; 
+}
+
+
+void delay(int  n)
+{
+  int i;
+  int j;
+  for (i=0;i<n;i++)
+  {
+     WDTCN=0xa5;
+    for(j=0;j<100;j++);
+  }
+}    
+
+
+//bit erase_enable=1;
+/*
+void int0_isr(void) interrupt 0  using 0
+{
+	erase_enable=0; 
+}
+*/
+
+
+void scan_keyboard(void)
+{
+  if  ( ((function_flag==0)&&(key_value==0x04))==1 )
+  {
+  		disp_laser_state2();	
+		find_key=0;
+  }
+  if  ( ((function_flag==0)&&(shift_right_flag==1))==1 )
+  {
+  		disp_1c_2c_state();	
+		find_key=0;
+  }
+  if ( ( (function_flag==0)&&(enter_flag==1) )==1 )
+  {
+    	enter_flag=0;
+		find_key=0;
+  }
+  switch(function_flag)
+  {
+		case 1:	x=1;			 //发射率与斜率
+				y=seg0[14];
+				send();
+				x=2;
+				y=seg0[18];
+				send();
+				x=3;
+				y=seg0[18];
+				send();
+				x=4;
+				y=seg1[12];
+				send();
+				x=5;
+				y=seg0[16];
+				send();
+				find_key=1;
+				if	(enter_flag==1)
+				{
+	 				emissivity_slope();
+					find_key=0;
+			 	}
+				break;
+		case 2:	x=1;			 //检测模式
+				y=seg0[19];
+				send();
+				x=2;
+				y=seg0[0];
+				send();
+				x=3;
+				y=seg0[13];
+				send();
+				x=4;
+				y=seg0[14];
+				send();
+				x=5;
+				y=seg0[16];
+				send();
+				find_key=1;
+			 	if (enter_flag==1)
+			 	{
+					state();
+					find_key=0;
+		      	}
+				break;
+        case 3:	x=1;			  //响应时间
+				y=seg1[13];
+				send();
+				x=2;
+				y=seg0[1];
+				send();
+				x=3;
+				y=seg0[19];
+				send();
+				x=4;
+				y=seg0[14];
+				send();
+				x=5;
+				y=seg0[16];
+				send();
+				find_key=1;
+			  	if (enter_flag==1)
+			  	{
+			  		 mode_time();
+					 find_key=0;
+			  	}
+				break;
+
+		case 4: x=1;			   //上限报警
+				y=seg1[14];
+				send();
+				x=2;
+				y=seg1[12];
+				send();
+				x=3;
+				y=seg0[10];
+				send();
+				x=4;
+				y=seg1[11];
+				send();
+				x=5;
+				y=seg0[16];
+				send();
+				find_key=1;
+			  	if (enter_flag==1)
+			 	{
+			   	 	limit_up();
+					find_key=0;
+		       	}
+				break;
+		case 5: x=1;			  //下限报警
+				y=seg1[11];
+				send();
+				x=2;
+				y=seg0[0];
+				send();
+				x=3;
+				y=seg0[10];
+				send();
+				x=4;
+				y=seg1[11];
+				send();
+				x=5;
+				y=seg0[16];
+			    send();
+				find_key=1;
+				if (enter_flag==1)
+		        {
+					limit_down();
+					find_key=0;
+				}
+				break;
+		case 6:	x=1;				  //上下限死区
+				y=seg0[11];
+				send();
+				x=2;
+				y=seg0[10];
+				send();
+				x=3;
+				y=seg0[19];
+				send();
+				x=4;
+				y=seg0[13];
+				send();
+				x=5;
+				y=seg0[16];
+				send();
+				find_key=1;
+				if (enter_flag==1)
+			    {
+					dead_band();
+					find_key=0;
+				}
+				break;
+		case 7:	x=1;				//电流开始端
+				y=seg0[10];
+				send();
+				x=2;
+				y=seg0[5];
+				send();
+				x=3;
+				y=seg1[13];
+				send();
+				x=4;
+				y=seg0[10];
+				send();
+				x=5;
+				y=seg0[16];
+				send();
+		 		find_key=1;
+				if (enter_flag==1)
+			    {
+				 	ma_start();
+					find_key=0;
+		 	  	}
+				break;
+		case 8: x=1;				 //电流结束端 
+				y=seg0[10];
+				send();
+				x=2;
+				y=seg0[14];
+				send();
+				x=3;
+				y=seg0[19];
+				send();
+				x=4;
+				y=seg0[13];
+				send();
+				x=5;
+				y=seg0[16];
+				send();
+				 find_key=1;
+				 if (enter_flag==1)
+			     {
+				   	ma_end();
+					find_key=0;
+				  }
+				break;
+		case 9: x=1;					 //c/f选择开关
+				y=seg0[12];
+				send();
+				x=2;
+				y=seg0[18];
+				send();
+				x=3;
+				y=seg0[15];
+				send();
+				x=4;
+				y=seg0[16];
+				send();
+				x=5;
+				y=seg0[16];
+				send();
+				find_key=1;
+				if (enter_flag==1)
+				{	
+				    disp_c_f_state();	  //disp_laser_state();
+					find_key=0;
+				}	
+				break;
+        case 10:x=1;				 //上下限报警选择
+				y=seg1[15];
+				send();
+				x=2;
+				y=seg1[12];
+				send();
+				x=3;
+				y=seg1[13];
+				send();
+				x=4;
+				y=seg0[16];
+				send();
+				x=5;
+				y=seg0[16];
+				send();
+				find_key=1;
+				if (enter_flag==1)
+				{
+					opt();
+					find_key=0;
+				}
+				break;
+		case 11:x=1;				//双色允许衰减系数
+				y=seg0[10];
+				send();
+				x=2;
+				y=seg1[13];
+				send();
+				x=3;
+				y=seg1[13];
+				send();
+				x=4;
+				y=seg0[14];
+				send();
+				x=5;
+				y=seg0[16];
+				send();
+				find_key=1;
+				if (enter_flag==1)
+				{
+					disp_2c_low();
+					find_key=0;
+				}
+				break;
+		case 12:x=1;			 //内部温度显示
+				y=seg0[1];
+				send();
+				x=2;
+				y=seg0[19];
+				send();
+				x=3;
+				y=seg1[13];
+				send();
+				x=4;
+				y=seg1[12];
+				send();
+				x=5;
+				y=seg0[16];
+				send();
+				find_key=1;
+				if	(enter_flag==1)
+				{
+					find_key=0;
+					tambient_disp_enable=1;
+					tambient_disp();
+				}	
+				break;
+		case 13:x=1;				 //双色信号比例
+				y=seg0[11];
+				send();
+				x=2;
+				y=seg0[18];
+				send();
+				x=3;
+				y=seg0[5];
+				send();
+				x=4;
+				y=seg0[16];
+				send();
+				x=5;
+				y=seg0[16];
+				send();
+				find_key=1;
+				if (enter_flag==1)
+				{	
+					disp_single();
+					find_key=0;
+				}
+				break;
+				default: break;
+	}
+
+ if (up_shift_flag==1)				 //	up_flag=0;  组合键
+  {     
+    if   (par_buf[58]==0x01)                                             	//shift_right_flag=0
+    {	
+	  	x=1;
+		y=seg0[10];
+		send();
+		x=2;
+		y=seg0[13];
+		send();
+		x=3;
+		y=seg0[1];
+		send();
+		x=4;
+		y=seg0[16];
+		send();
+		x=5;
+		y=seg0[16];
+		send();
+		find_key=1;	
+		if	(enter_flag==1)
+		{
+	 		emiss_adj1();
+			find_key=0;
+	 	}
+     }
+	else if   (par_buf[58]==0x02)                                             	//shift_right_flag=0
+    {	
+	  	x=1;
+		y=seg0[10];
+		send();
+		x=2;
+		y=seg0[13];
+		send();
+		x=3;
+		y=seg0[2];
+		send();
+		x=4;
+		y=seg0[16];
+		send();
+		x=5;
+		y=seg0[16];
+		send();
+		find_key=1;	
+		if	(enter_flag==1)
+		{
+	 		slope_adj2();
+			find_key=0;
+	 	}
+     }
+  }
+}
+
+void disp_2c_low(void)
+{
+	uint data tc_low;
+	//par_buf=0x0400;
+   	e=par_buf[54];
+   	f=par_buf[55];
+   	g=par_buf[56];
+	shift_right_flag=1;
+	up_flag=0;
+    enter_flag=0;
+    do
+    { 	
+		WDTCN=0xa5;
+		shift0_3();	
+		//判断系数设置范围在0.85到1.15之间
+		if (enter_flag==1)
+		{
+			//read_par(); 
+			//par_buf=0x0400;
+			tc_low=e*100+f*10+g;
+		   	if ( (tc_low>100)||(tc_low<20) )		//20%-100%
+			{
+				enter_flag=0;
+			}
+		}
+	}
+	while  (enter_flag==0); 
+	{   
+		EA=0;
+	    key_flag_init();
+		//par_buf=0x0400;
+		par_buf[54]=e;
+		par_buf[55]=f;
+		par_buf[56]=g;
+	    erase_par();
+		write_par();			//将修改好后的内容写入flash		
+		EA=1;
+	}
+
+}
+
+
+//c/f 选择
+/*void disp_c_f_state(void)
+{	
+	//read_par();
+	//par_buf=0x0400;
+	c_f_flag=par_buf[36];
+	if (c_f_flag==0)
+	{
+		c_f_flag=1;
+	}
+	else if (c_f_flag==1)
+	{	
+		c_f_flag=0;
+	}
+	EA=0;
+	key_flag_init();
+	key_value=0x00;
+	//par_buf=0x0400;
+	par_buf[36]=c_f_flag;
+	erase_par();
+	write_par();			//将修改好后的内容写入flash
+	EA=1;   	  
+}*/
+//c/f 选择
+void disp_c_f_state(void)
+{
+	//read_par(); 
+	//par_buf=0x0400;
+	e=par_buf[36];
+	up_flag=e;
+	enter_flag=0;
+	do
+    { 	
+		disp_c_f_state1();	  	
+		WDTCN=0xa5;
+	 }
+	while  (enter_flag==0); 
+	{   
+		EA=0;
+		key_flag_init();
+		//par_buf=0x0400;
+		par_buf[36]=e;
+		
+	    erase_par();
+		write_par();			//将修改好后的内容写入flash		
+		EA=1;
+	}
+}
+
+
+void disp_c_f_state1(void)
+{
+	do
+	{ 
+		 WDTCN=0xa5;
+		 if (up_flag==1)
+		 {
+			e=1;
+			disp_c_f_f();
+		  }
+		  else if (up_flag==0)
+		  {
+		  	e=0;	
+			disp_c_f_c();
+		  }
+		  else if (up_flag>=2)
+		  {
+		  	e=0;
+			up_flag=0;
+			disp_c_f_c();
+		  }	  
+	}
+      while ( enter_flag==0 );	 	
+}
+
+
+
+void disp_c_f_c(void)
+{
+	x=1;
+	y=seg0[12];
+	send();
+	x=2;
+	y=seg0[16];
+	send();
+	x=3;
+	y=seg0[16];
+	send();
+	x=4;
+	y=seg0[16];
+	send();
+	x=5;
+	y=seg0[16];
+	send();
+}
+void disp_c_f_f(void)
+{
+	x=1;
+	y=seg0[15];
+	send();
+	x=2;
+	y=seg0[16];
+	send();
+	x=3;
+	y=seg0[16];
+	send();
+	x=4;
+	y=seg0[16];
+	send();
+	x=5;
+	y=seg0[16];
+	send();
+}
+
+void disp_1c_2c_state(void)								 //00000000000000
+{
+	EA=0;
+	tobj_real=0;	//复位显示值
+	if (par_buf[58]==2)
+	{
+		par_buf[58]=1;
+		tobj_temp_min=two_color_end;
+		tobj_temp_max=two_color_start;
+		Yn_old=table_1c[0];
+	}
+	else if (par_buf[58]==1)
+	{
+		par_buf[58]=2;
+		tobj_temp_min=table_1c[1000];
+		tobj_temp_max=table_1c[0];
+		Yn_old=two_color_start;
+	}
+	key_flag_init();
+	erase_par();
+	write_par();			//将修改好后的内容写入flash
+	EA=1;
+}
+
+
+//发射率,斜率显示子程序
+void emissivity_slope(void)
+{
+	uint data slope_range;
+	uint data emissivity_range;
+   	//read_par(); 
+	//par_buf=0x0400;
+	if (par_buf[58]==0x02)	//双色模式
+	{
+	   	e=par_buf[0];
+	   	f=par_buf[1];
+	   	g=par_buf[2];
+		h=par_buf[57];
+	}
+	else if (par_buf[58]==0x01)		//单色模式
+	{
+  		e=par_buf[59];
+	   	f=par_buf[60];
+	   	g=par_buf[61];
+	}
+	shift_right_flag=1;
+	up_flag=0;
+	enter_flag=0;
+    do
+    { 	
+		WDTCN=0xa5;
+		if (par_buf[58]==0x02)	//双色模式
+		{
+			shift0_4();	//显示4位
+		}
+		else if	(par_buf[58]==0x01)	//单色模式
+		{
+			shift0_3();	//显示3位
+		} 
+		//判断系数设置范围在0.85到1.15之间
+		if (enter_flag==1)
+		{
+			//read_par(); 
+			//par_buf=0x0400;
+			if (par_buf[58]==0x02)	//双色模式
+			{
+				slope_range=e*1000+f*100+g*10+h;
+				if (slope_range!=0)		//用于测试
+				{
+			   	 	if ( (slope_range>1150)||(slope_range<850) )
+					{
+						enter_flag=0;
+					}
+				}
+			}
+			else if	(par_buf[58]==0x01)	//单色模式
+			{
+				emissivity_range=e*100+f*10+g;
+			   	if ( (emissivity_range>100)||(emissivity_range<10) )
+				{
+					enter_flag=0;
+				}
+			} 
+		}
+	}
+	while  (enter_flag==0); 
+	{   
+		EA=0;
+	    key_flag_init();
+		//par_buf=0x0400;
+		if (par_buf[58]==0x02)	//双色模式
+		{
+		   	par_buf[0]=e;
+		   	par_buf[1]=f;
+	   		par_buf[2]=g;
+			par_buf[57]=h;
+		}
+		else if (par_buf[58]==0x01)		//单色模式
+		{
+  			par_buf[59]=e;
+		   	par_buf[60]=f;
+		   	par_buf[61]=g;
+		}
+	    erase_par();
+		write_par();			//将修改好后的内容写入flash		
+		EA=1;
+	} 
+}
+
+//emiss_adj1显示子程序
+void emiss_adj1(void)
+{
+   	//read_par(); 
+	//par_buf=0x0400;
+   	e=par_buf[63];
+   	f=par_buf[64];
+   	g=par_buf[65];
+	shift_right_flag=1;
+	up_flag=0;
+    enter_flag=0;
+    do
+    { 	
+		shift0_3();	  	
+		WDTCN=0xa5;
+	 }
+	while  (enter_flag==0); 
+	{   
+		EA=0;
+	    key_flag_init();
+	//	par_buf=0x0400;
+		par_buf[63]=e;
+		par_buf[64]=f;
+		par_buf[65]=g;
+	    erase_par();
+		write_par();			//将修改好后的内容写入flash		
+		EA=1;
+//   	display();
+	} 
+}
+
+//slope_adj2显示子程序
+void slope_adj2(void)
+{
+   //	read_par(); 
+//	par_buf=0x0400;
+   	e=par_buf[70];
+   	f=par_buf[71];
+   	g=par_buf[72];
+	h=par_buf[73];
+	shift_right_flag=1;
+	up_flag=0;
+    enter_flag=0;
+    do
+    { 	
+		shift0_4();	  	
+		WDTCN=0xa5;
+	 }
+	while  (enter_flag==0); 
+	{   
+		EA=0;
+	    key_flag_init();
+//		par_buf=0x0400;
+		par_buf[70]=e;
+		par_buf[71]=f;
+		par_buf[72]=g;
+	    par_buf[73]=h;
+	    erase_par();
+		write_par();			//将修改好后的内容写入flash		
+		EA=1;
+//   	display();
+	} 
+}
+
+void  shift0_3(void)
+{    
+	  if (shift_right_flag==1)			//第一位闪烁
+	  {    
+	  	 up_flag=e;
+    	 do
+		 { 
+		  	WDTCN=0xa5;
+			switch(up_flag)
+			{
+			    case 0: e=0; break;
+				case 1:	e=1; break;
+				case 2: e=2; break;
+				case 3: e=3; break;
+				case 4: e=4; break;
+				case 5: e=5; break;
+				case 6: e=6; break;
+				case 7: e=7; break;
+				case 8: e=8; break;
+				case 9: e=9; break;
+				case 10: e=0; break;
+            }
+ 			disp_emissivity_3();
+		  }
+          while ( (shift_right_flag==1)&&(enter_flag==0) );		 
+	  }
+	  else if (shift_right_flag==2)			//第二位闪烁
+	  {  
+	    up_flag=f;   
+		do
+		{ 
+		  	WDTCN=0xa5;
+			switch(up_flag)
+			{
+			    case 0: f=0; break;
+				case 1:	f=1; break;
+				case 2: f=2; break;
+				case 3: f=3; break;
+				case 4: f=4; break;
+				case 5: f=5; break;
+				case 6: f=6; break;
+				case 7: f=7; break;
+				case 8: f=8; break;
+				case 9: f=9; break;
+				case 10: f=0; break;
+            }
+ 			disp_emissivity_3();
+         } 
+			while ( (shift_right_flag==2)&&(enter_flag==0) );			 
+	  }	 
+	  else if (shift_right_flag==3)		//第三位闪烁
+	  {
+	     up_flag=g;
+	     do
+		 { 
+		  	WDTCN=0xa5;
+			switch(up_flag)
+			{
+			    case 0: g=0; break;
+				case 1:	g=1; break;
+				case 2: g=2; break;
+				case 3: g=3; break;
+				case 4: g=4; break;
+				case 5: g=5; break;
+				case 6: g=6; break;
+				case 7: g=7; break;
+				case 8: g=8; break;
+				case 9: g=9; break;
+				case 10: g=0; break;
+            }
+ 			disp_emissivity_3();
+         } 
+			while ( (shift_right_flag==3)&&(enter_flag==0) );	
+	 }
+	 else if (shift_right_flag==4)
+	 {
+	 	shift_right_flag=1;
+	 }
+}
+
+
+void disp_emissivity_3(void)
+{
+   if (shift_right_flag==1)			//第一位闪烁显示
+   {
+       disp_emissivity0_3();
+       delay(300);
+	   x=1;
+	   y=seg0[16];
+	   send();
+	   x=2;
+       y=seg0[f];
+       send();
+       x=3;
+       y=seg0[g];
+       send();
+       x=4;
+       y=seg0[16];
+	   send();
+	   x=5;
+       y=seg0[16];
+       send();
+	   delay(300);
+      }
+	else if (shift_right_flag==2)				//第二位闪烁显示
+	{
+	     disp_emissivity0_3();
+		 delay(300);
+		 x=1;
+         y=seg1[e];
+         send();
+         x=2;
+         y=seg0[16];
+         send();
+         x=3;
+         y=seg0[g];
+         send();
+         x=4;
+         y=seg0[16];
+		 send();
+		 x=5;
+         y=seg0[16];
+         send();
+		 delay(300);       
+      }
+	  else if (shift_right_flag==3)			//第三位闪烁显示
+	  {
+	       disp_emissivity0_3();
+		   delay(300); 
+		   x=1;
+           y=seg1[e];
+           send();
+           x=2;
+	       y=seg0[f];
+      	   send();
+	       x=3;
+     	   y=seg0[16];
+	       send();
+	       x=4;
+	       y=seg0[16];
+		   send();
+		   x=5;
+           y=seg0[16];
+     	   send();
+		   delay(300);
+	}
+	else if (shift_right_flag==4)
+	{
+	 	shift_right_flag=1;
+	}
+}
+
+
+void disp_emissivity0_3(void)			//正常显示，不闪
+{
+  	  x=1;
+      y=seg1[e];
+      send();
+      x=2;
+      y=seg0[f];
+      send();
+      x=3;
+      y=seg0[g];
+      send();
+      x=4;
+      y=seg0[16];
+      send();
+	  x=5;
+	  y=seg0[16];
+	  send();
+}
+
+
+
+void  shift0_4(void)
+{    
+	  if (shift_right_flag==1)			//第一位闪烁
+	  {    
+	  	 up_flag=e;
+    	 do
+		 { 
+		  	WDTCN=0xa5;
+			switch(up_flag)
+			{
+			    case 0: e=0; break;
+				case 1:	e=1; break;
+				case 2: e=2; break;
+				case 3: e=3; break;
+				case 4: e=4; break;
+				case 5: e=5; break;
+				case 6: e=6; break;
+				case 7: e=7; break;
+				case 8: e=8; break;
+				case 9: e=9; break;
+				case 10: e=0; break;
+            }
+ 			disp_emissivity_4();
+		  }
+          while ( (shift_right_flag==1)&&(enter_flag==0) );		 
+	  }
+	  else if (shift_right_flag==2)			//第二位闪烁
+	  {  
+	    up_flag=f;   
+		do
+		{ 
+		  	WDTCN=0xa5;
+			switch(up_flag)
+			{
+			    case 0: f=0; break;
+				case 1:	f=1; break;
+				case 2: f=2; break;
+				case 3: f=3; break;
+				case 4: f=4; break;
+				case 5: f=5; break;
+				case 6: f=6; break;
+				case 7: f=7; break;
+				case 8: f=8; break;
+				case 9: f=9; break;
+				case 10: f=0; break;
+            }
+ 			disp_emissivity_4();
+         } 
+			while ( (shift_right_flag==2)&&(enter_flag==0) );			 
+	  }	 
+	  else if (shift_right_flag==3)		//第三位闪烁
+	  {
+	     up_flag=g;
+	     do
+		 { 
+		  	WDTCN=0xa5;
+			switch(up_flag)
+			{
+			    case 0: g=0; break;
+				case 1:	g=1; break;
+				case 2: g=2; break;
+				case 3: g=3; break;
+				case 4: g=4; break;
+				case 5: g=5; break;
+				case 6: g=6; break;
+				case 7: g=7; break;
+				case 8: g=8; break;
+				case 9: g=9; break;
+				case 10: g=0; break;
+            }
+ 			disp_emissivity_4();
+         } 
+			while ( (shift_right_flag==3)&&(enter_flag==0) );	
+	 }
+	else if (shift_right_flag==4)		//第三位闪烁
+	{
+	     up_flag=h;
+	     do
+		 { 
+		  	WDTCN=0xa5;
+			switch(up_flag)
+			{
+			    case 0: h=0; break;
+				case 1:	h=1; break;
+				case 2: h=2; break;
+				case 3: h=3; break;
+				case 4: h=4; break;
+				case 5: h=5; break;
+				case 6: h=6; break;
+				case 7: h=7; break;
+				case 8: h=8; break;
+				case 9: h=9; break;
+				case 10: h=0; break;
+            }
+ 			disp_emissivity_4();
+         } 
+			while ( (shift_right_flag==4)&&(enter_flag==0) );	
+	 }
+	 else if (shift_right_flag==5)
+	 {
+	 	shift_right_flag=1;
+	 }
+}
+
+
+void disp_emissivity_4(void)
+{
+   if (shift_right_flag==1)			//第一位闪烁显示
+   {
+       disp_emissivity0_4();
+       delay(300);
+	   x=1;
+	   y=seg0[16];
+	   send();
+	   x=2;
+       y=seg0[f];
+       send();
+       x=3;
+       y=seg0[g];
+       send();
+       x=4;
+       y=seg0[h];
+	   send();
+	   x=5;
+       y=seg0[16];
+       send();
+	   delay(300);
+      }
+	else if (shift_right_flag==2)				//第二位闪烁显示
+	{
+	     disp_emissivity0_4();
+		 delay(300);
+		 x=1;
+         y=seg1[e];
+         send();
+         x=2;
+         y=seg0[16];
+         send();
+         x=3;
+         y=seg0[g];
+         send();
+         x=4;
+         y=seg0[h];
+		 send();
+		 x=5;
+         y=seg0[16];
+         send();
+		 delay(300);       
+      }
+	  else if (shift_right_flag==3)			//第三位闪烁显示
+	  {
+	       disp_emissivity0_4();
+		   delay(300); 
+		   x=1;
+           y=seg1[e];
+           send();
+           x=2;
+	       y=seg0[f];
+      	   send();
+	       x=3;
+     	   y=seg0[16];
+	       send();
+	       x=4;
+	       y=seg0[h];
+		   send();
+		   x=5;
+           y=seg0[16];
+     	   send();
+		   delay(300);
+	}
+	else if (shift_right_flag==4)			//第4位闪烁显示
+	 {
+	       disp_emissivity0_4();
+		   delay(300); 
+		   x=1;
+           y=seg1[e];
+           send();
+           x=2;
+	       y=seg0[f];
+      	   send();
+	       x=3;
+     	   y=seg0[g];
+	       send();
+	       x=4;
+	       y=seg0[16];
+		   send();
+		   x=5;
+           y=seg0[16];
+     	   send();
+		   delay(300);
+	}
+	else if (shift_right_flag==5)
+	{
+	 	shift_right_flag=1;
+	}
+}
+
+
+void disp_emissivity0_4(void)			//正常显示，不闪
+{
+  	  x=1;
+      y=seg1[e];
+      send();
+      x=2;
+      y=seg0[f];
+      send();
+      x=3;
+      y=seg0[g];
+      send();
+      x=4;
+      y=seg0[h];
+      send();
+	  x=5;
+	  y=seg0[16];
+	  send();
+}
+
+
+//选择采样模式的状态
+void state(void)
+{	
+	//read_par(); 
+	//par_buf=0x0400;
+   	e=par_buf[3];
+	up_flag=e;
+    enter_flag=0;
+    do
+    { 	
+		shift1();	  	
+		WDTCN=0xa5;
+	 }
+	while  (enter_flag==0); 
+	{   
+		EA=0;
+	    key_flag_init();
+		//par_buf=0x0400;
+		par_buf[3]=e;
+	    erase_par();
+		write_par();			//将修改好后的内容写入flash
+		EA=1;
+   	    //display();
+	 }
+}	
+
+//上下限选择
+void opt(void)
+{	
+	//read_par(); 
+	//par_buf=0x0400;
+   	e=par_buf[74];
+	up_flag=e;
+    enter_flag=0;
+    do
+    { 	
+		shift21();	  	
+		WDTCN=0xa5;
+	 }
+	while  (enter_flag==0); 
+	{   
+		EA=0;
+	    key_flag_init();
+		//par_buf=0x0400;
+		par_buf[74]=e;
+	    erase_par();
+		write_par();			//将修改好后的内容写入flash
+		EA=1;
+   	    //display();
+	 }
+}		
+void shift1(void)
+{
+    do
+	{ 
+		 WDTCN=0xa5;
+		 if (up_flag==1)
+		 {
+			e=1;
+		  }
+		  else if (up_flag==2)
+		  {
+		  	e=2;
+		  }
+		  else if (up_flag==3)
+		  {
+		  	e=3;
+		   }
+		  else if (up_flag==4)
+		  {
+		   	e=1;
+			up_flag=1;
+		   }
+ 		 disp_state();
+	}
+      while ( enter_flag==0 );	
+}    
+ 
+void shift21(void)
+{
+    do
+	{ 
+		 WDTCN=0xa5;
+		 if (up_flag==1)
+		 {
+			e=1;
+		  }
+		  else if (up_flag==2)
+		  {
+		  	e=2;
+		  }
+		  else if (up_flag==3)
+		  {
+		  	e=1;
+			up_flag=1;
+		   }
+	
+ 		 disp_state();
+	}
+      while ( enter_flag==0 );	
+}    
+ 	
+void disp_state(void)			//状态位闪烁
+{
+	x=1;
+    y=seg0[e];
+	send();
+	x=2;
+	y=seg0[16];
+	send();
+	x=3;
+	y=seg0[16];
+	send();
+	x=4;
+	y=seg0[16];
+	send();
+	x=5;
+	y=seg0[16];
+	send();
+    delay(300);
+	x=1;
+	y=seg0[16];
+	send();
+	x=2;
+    y=seg0[16];
+	send();
+    x=3;
+    y=seg0[16];
+    send();
+    x=4;
+    y=seg0[16];
+    send();
+	x=5;
+	y=seg0[16];
+	send();
+    delay(300);
+}
+
+//模式时间子程序
+void mode_time(void)
+{
+    //read_par(); 
+	//par_buf=0x0400;
+   	e=par_buf[4];
+   	f=par_buf[5];
+   	g=par_buf[6];
+	h=par_buf[53];
+	shift_right_flag=1;
+	up_flag=0;
+    enter_flag=0;
+    do//pjl
+    { 	
+		WDTCN=0xa5;
+		shift2();		
+	 }
+	while  (enter_flag==0); 
+	{   
+		EA=0;
+	    key_flag_init();
+		//par_buf=0x0400;
+		par_buf[4]=e;
+		par_buf[5]=f;
+		par_buf[6]=g;
+		par_buf[53]=h;
+	    erase_par();
+		write_par();			//将修改好后的内容写入flash
+		EA=1;
+//		display();			
+	} 
+}
+
+void shift2(void)
+{
+    if (shift_right_flag==1)			//第一位闪烁
+	 {    
+	  	 up_flag=e;
+    	 do
+		 { 
+		  	WDTCN=0xa5;
+			switch(up_flag)
+			{
+			    case 0: e=0; break;
+				case 1:	e=1; break;
+				case 2: e=2; break;
+				case 3: e=3; break;
+				case 4: e=4; break;
+				case 5: e=5; break;
+				case 6: e=6; break;
+				case 7: e=7; break;
+				case 8: e=8; break;
+				case 9: e=9; break;
+				case 10: e=0; break;
+            }
+ 			disp_mode_time();
+		  }
+          while ( (shift_right_flag==1)&&(enter_flag==0) );		 
+	  }
+	  else if (shift_right_flag==2)			//第二位闪烁
+	  {  
+	    up_flag=f;   
+		do
+		{ 
+		  	WDTCN=0xa5;
+			switch(up_flag)
+			{
+			    case 0: f=0; break;
+				case 1:	f=1; break;
+				case 2: f=2; break;
+				case 3: f=3; break;
+				case 4: f=4; break;
+				case 5: f=5; break;
+				case 6: f=6; break;
+				case 7: f=7; break;
+				case 8: f=8; break;
+				case 9: f=9; break;
+				case 10: f=0; break;
+            }
+ 			disp_mode_time();
+         } 
+			while ( (shift_right_flag==2)&&(enter_flag==0) );			 
+	  }	 
+	  else if (shift_right_flag==3)		//第三位闪烁
+	  {
+	     up_flag=g;
+	     do
+		 { 
+		  	WDTCN=0xa5;
+			switch(up_flag)
+			{
+			    case 0: g=0; break;
+				case 1:	g=1; break;
+				case 2: g=2; break;
+				case 3: g=3; break;
+				case 4: g=4; break;
+				case 5: g=5; break;
+				case 6: g=6; break;
+				case 7: g=7; break;
+				case 8: g=8; break;
+				case 9: g=9; break;
+				case 10: g=0; break;
+            }
+ 			disp_mode_time();
+         } 
+			while ( (shift_right_flag==3)&&(enter_flag==0) );	
+	 }
+	else if (shift_right_flag==4)		//第三位闪烁
+	 {
+	     up_flag=h;
+	     do
+		 { 
+		  	WDTCN=0xa5;
+			switch(up_flag)
+			{
+			    case 0: h=0; break;
+				case 1:	h=1; break;
+				case 2: h=2; break;
+				case 3: h=3; break;
+				case 4: h=4; break;
+				case 5: h=5; break;
+				case 6: h=6; break;
+				case 7: h=7; break;
+				case 8: h=8; break;
+				case 9: h=9; break;
+				case 10: h=0; break;
+            }
+ 			disp_mode_time();
+         } 
+		while ( (shift_right_flag==4)&&(enter_flag==0) );	
+	 }
+	else if (shift_right_flag==5)	
+	{
+	 	shift_right_flag=1;
+	}
+
+}
+
+void disp_mode_time(void)
+{
+  if (shift_right_flag==1)			//第一位闪烁显示
+   {
+       disp_mode_time0();
+       delay(300);
+	   x=1;
+	   y=seg0[16];
+	   send();
+	   x=2;
+       y=seg0[f];
+       send();
+       x=3;
+       y=seg1[g];
+       send();
+       x=4;
+       y=seg0[h];
+	   send();
+	   x=5;
+       y=seg0[16];
+       send();
+	   delay(300);
+      }
+	else if (shift_right_flag==2)				//第二位闪烁显示
+	{
+	     disp_mode_time0();
+		 delay(300);
+		 x=1;
+         y=seg0[e];
+         send();
+         x=2;
+         y=seg0[16];
+         send();
+         x=3;
+         y=seg1[g];
+         send();
+         x=4;
+         y=seg0[h];
+		 send();
+		 x=5;
+         y=seg0[16];
+         send();
+		 delay(300);       
+      }
+	  else if (shift_right_flag==3)			//第三位闪烁显示
+	  {
+	       disp_mode_time0();
+		   delay(300); 
+           x=1;
+           y=seg0[e];
+           send();
+           x=2;
+	       y=seg0[f];
+      	   send();
+	       x=3;
+     	   y=seg0[16];
+	       send();
+	       x=4;
+	       y=seg0[h];
+		   send();
+		   x=5;
+           y=seg0[16];
+     	   send();
+		   delay(300);
+	}
+	else if (shift_right_flag==4)			//第4位闪烁显示
+	{
+	       disp_mode_time0();
+		   delay(300); 
+           x=1;
+           y=seg0[e];
+           send();
+           x=2;
+	       y=seg0[f];
+      	   send();
+	       x=3;
+     	   y=seg1[g];
+	       send();
+	       x=4;
+	       y=seg0[16];
+		   send();
+		   x=5;
+           y=seg0[16];
+     	   send();
+		   delay(300);
+	}
+	else if (shift_right_flag==5)	
+	{
+		shift_right_flag=1;
+	}
+}
+
+
+void disp_mode_time0(void)		//正常显示，不闪
+{
+  	  x=1;
+      y=seg0[e];
+      send();
+      x=2;
+      y=seg0[f];
+      send();
+      x=3;
+      y=seg1[g];
+      send();
+      x=4;
+      y=seg0[h];
+      send();
+	  x=5;
+	  y=seg0[16];
+	  send();
+}
+
+uint idata temp_f_out;
+uint idata temp_c_out;
+//上限报警子程序
+void limit_up(void)
+{
+	uint data temp_c,temp_f;
+	limit_up0();
+	do
+    { 	
+		WDTCN=0xa5;	
+		shift3();
+	    key_value_range_0to2000();
+	 }
+	while( enter_flag==0 ); 
+	{   
+		//存储数据
+    	//read_par(); 
+		//par_buf=0x0400;
+		c_f_flag=par_buf[36];
+		if (c_f_flag==0)
+		{
+			cf_select();
+			temp_f=temp_f_out;
+			e1=temp_f/1000;
+			f1=(temp_f%1000)/100;
+			g1=(temp_f%100)/10;
+			h1=temp_f%10;
+		}
+		else if (c_f_flag==1)
+		{
+			cf_select();
+			temp_c=temp_c_out;
+	 		e=temp_c/1000;
+			f=(temp_c%1000)/100;
+			g=(temp_c%100)/10;
+			h=temp_c%10;	  
+		}	
+		par_buf[7]=e;
+		par_buf[8]=f;
+		par_buf[9]=g;
+		par_buf[10]=h;
+		par_buf[37]=e1;
+   	    par_buf[38]=f1;
+	    par_buf[39]=g1;
+  	   	par_buf[40]=h1;
+	    EA=0;
+	    key_flag_init();
+	    //par_buf=0x0400;
+	    erase_par();
+   	    write_par();			//将修改好后的内容写入flash
+  	    EA=1;			
+   } 
+}
+
+void cf_select(void)
+{
+	ulong data temp1_c;	
+	uchar data buff;
+	uint data temp1_f;
+	//read_par(); 
+	//par_buf=0x0400;
+	c_f_flag=par_buf[36];
+	if (c_f_flag==0)
+	{		
+		temp1_f=e*1000+f*100+g*10+h;
+		temp1_f=temp1_f*18+320;
+		buff=temp1_f%10;
+		if (buff>=5)
+		{
+			temp1_f=temp1_f+10;
+		}
+		temp1_f=temp1_f/10;
+		temp_f_out=temp1_f;	//将转换结果输出
+	}
+	else if (c_f_flag==1)
+	{
+		temp1_c=e1*1000+f1*100+g1*10+h1;
+		temp1_c=temp1_c*100;
+		temp1_c=temp1_c-3200;
+		temp1_c=temp1_c/18;
+		buff=temp1_f%10;
+		if (buff>=5)
+		{
+			temp1_f=temp1_f+10;
+		}
+		temp1_c=temp1_c/10;
+		temp_c_out=(uint) (temp1_c);	//将转换结果输出
+	}		
+}
+
+
+//显示当前上限报警子程序
+void limit_up0(void)
+{
+	uint data temp_c,temp_f;
+    //read_par(); 
+	//par_buf=0x0400;
+	c_f_flag=par_buf[36];
+	if (c_f_flag==0)
+	{
+		e=par_buf[7];
+		f=par_buf[8];
+		g=par_buf[9];
+		h=par_buf[10];
+		cf_select();
+		temp_f=temp_f_out;
+		e1=temp_f/1000;
+		f1=(temp_f%1000)/100;
+		g1=(temp_f%100)/10;
+		h1=temp_f%10;
+	}
+	else if (c_f_flag==1)
+	{
+		e1=par_buf[37];
+		f1=par_buf[38];
+		g1=par_buf[39];
+		h1=par_buf[40];
+		cf_select();
+		temp_c=temp_c_out;
+		e=temp_c/1000;
+	    f=(temp_c%1000)/100;
+	    g=(temp_c%100)/10;
+		h=temp_c%10;
+	}			
+	shift_right_flag=1;
+	up_flag=0;
+    enter_flag=0;   
+}
+
+void shift3(void)
+{	
+  	//read_par(); 
+	//par_buf=0x0400;
+	c_f_flag=par_buf[36];
+	if (c_f_flag==0)	
+	 {
+	     if (shift_right_flag==1)			//第一位闪烁
+		 {    
+	  		 up_flag=e;
+	    	 do
+			 { 
+			  	WDTCN=0xa5;
+				switch(up_flag)
+				{
+				    case 0: e=0; break;
+					case 1:	e=1; break;
+					case 2: e=2; break;
+					case 3: e=3; break;
+					case 4: e=4; break;
+					case 5: e=5; break;
+					case 6: e=6; break;
+					case 7: e=7; break;
+					case 8: e=8; break;
+					case 9: e=9; break;
+					case 10: e=0; break;
+	            }
+ 				disp_limit_up();
+			  }
+	          while ( (shift_right_flag==1)&&(enter_flag==0) );		 
+		  }
+		  else if (shift_right_flag==2)			//第二位闪烁
+		  {  
+		    up_flag=f;   
+			do
+			{ 
+			  	WDTCN=0xa5;
+				switch(up_flag)
+				{
+				    case 0: f=0; break;
+					case 1:	f=1; break;
+					case 2: f=2; break;
+					case 3: f=3; break;
+					case 4: f=4; break;
+					case 5: f=5; break;
+					case 6: f=6; break;
+					case 7: f=7; break;
+					case 8: f=8; break;
+					case 9: f=9; break;
+					case 10: f=0; break;
+	            }
+ 				disp_limit_up();
+	         } 
+				while ( (shift_right_flag==2)&&(enter_flag==0) );			 
+		  }	 
+		  else if (shift_right_flag==3)		//第三位闪烁
+		  {
+		     up_flag=g;
+		     do
+			 { 
+			  	WDTCN=0xa5;
+				switch(up_flag)
+				{
+				    case 0: g=0; break;
+					case 1:	g=1; break;
+					case 2: g=2; break;
+					case 3: g=3; break;
+					case 4: g=4; break;
+					case 5: g=5; break;
+					case 6: g=6; break;
+					case 7: g=7; break;
+					case 8: g=8; break;
+					case 9: g=9; break;
+					case 10: g=0; break;
+    	        }
+ 				disp_limit_up();
+	         } 
+			 while ( (shift_right_flag==3)&&(enter_flag==0) );	
+		 }
+		 else if (shift_right_flag==4)		//第四位闪烁
+		 {
+		     up_flag=h;
+		     do
+			 { 
+			  	WDTCN=0xa5;
+				switch(up_flag)
+				{
+				    case 0: h=0; break;
+					case 1:	h=1; break;
+					case 2: h=2; break;
+					case 3: h=3; break;
+					case 4: h=4; break;
+					case 5: h=5; break;
+					case 6: h=6; break;
+					case 7: h=7; break;
+					case 8: h=8; break;
+					case 9: h=9; break;
+					case 10: h=0; break;
+	            }
+ 				disp_limit_up();
+        	 } 
+			while ( (shift_right_flag==4)&&(enter_flag==0) );	
+		 }
+	}
+	else if (c_f_flag==1)	
+	{
+	     if (shift_right_flag==1)			//第一位闪烁
+		 {    
+	  		 up_flag=e1;
+	    	 do
+			 { 
+			  	WDTCN=0xa5;
+				switch(up_flag)
+				{
+				    case 0: e1=0; break;
+					case 1:	e1=1; break;
+					case 2: e1=2; break;
+					case 3: e1=3; break;
+					case 4: e1=4; break;
+					case 5: e1=5; break;
+					case 6: e1=6; break;
+					case 7: e1=7; break;
+					case 8: e1=8; break;
+					case 9: e1=9; break;
+					case 10: e1=0; break;
+	            }
+ 				disp_limit_up();
+			  }
+	          while ( (shift_right_flag==1)&&(enter_flag==0) );		 
+		  }
+		  else if (shift_right_flag==2)			//第二位闪烁
+		  {  
+		    up_flag=f1;   
+			do
+			{ 
+			  	WDTCN=0xa5;
+				switch(up_flag)
+				{
+				    case 0: f1=0; break;
+					case 1:	f1=1; break;
+					case 2: f1=2; break;
+					case 3: f1=3; break;
+					case 4: f1=4; break;
+					case 5: f1=5; break;
+					case 6: f1=6; break;
+					case 7: f1=7; break;
+					case 8: f1=8; break;
+					case 9: f1=9; break;
+					case 10: f1=0; break;
+	            }
+ 				disp_limit_up();
+	         } 
+				while ( (shift_right_flag==2)&&(enter_flag==0) );			 
+		  }	 
+		  else if (shift_right_flag==3)		//第三位闪烁
+		  {
+		     up_flag=g1;
+		     do
+			 { 
+			  	WDTCN=0xa5;
+				switch(up_flag)
+				{
+				    case 0: g1=0; break;
+					case 1:	g1=1; break;
+					case 2: g1=2; break;
+					case 3: g1=3; break;
+					case 4: g1=4; break;
+					case 5: g1=5; break;
+					case 6: g1=6; break;
+					case 7: g1=7; break;
+					case 8: g1=8; break;
+					case 9: g1=9; break;
+					case 10: g1=0; break;
+    	        }
+ 				disp_limit_up();
+	         } 
+			 while ( (shift_right_flag==3)&&(enter_flag==0) );	
+		 }
+		 else if (shift_right_flag==4)		//第四位闪烁
+		 {
+		     up_flag=h1;
+		     do
+			 { 
+			  	WDTCN=0xa5;
+				switch(up_flag)
+				{
+				    case 0: h1=0; break;
+					case 1:	h1=1; break;
+					case 2: h1=2; break;
+					case 3: h1=3; break;
+					case 4: h1=4; break;
+					case 5: h1=5; break;
+					case 6: h1=6; break;
+					case 7: h1=7; break;
+					case 8: h1=8; break;
+					case 9: h1=9; break;
+					case 10: h1=0; break;
+	            }
+ 				disp_limit_up();
+        	 } 
+			while ( (shift_right_flag==4)&&(enter_flag==0) );	
+		 }
+	}
+}
+
+void key_value_range_0to2000(void)
+{
+	uint data temp_c,temp_f;
+	if (enter_flag==1)
+	{
+		//read_par(); 
+		//par_buf=0x0400;
+		c_f_flag=par_buf[36];
+		if (c_f_flag==0)
+		{
+			temp_c=e*1000+f*100+g*10+h;
+			if ( (temp_c>2000)||(temp_c<0) )
+			{
+				enter_flag=0;
+			}
+		}
+		else if (c_f_flag==1)
+		{
+  			temp_f=e1*1000+f1*100+g1*10+h1;
+			if ( (temp_f>3632)||(temp_f<0) )
+			{
+				enter_flag=0;
+			}
+		}
+	}
+}
+
+
+void disp_limit_up(void)
+{
+   if (shift_right_flag==1)			//第一位闪烁显示
+   {
+        disp_limit_up0();  
+	    delay(300);
+	  	if (c_f_flag==0)
+		{
+			x=1;
+       		y=seg0[16];
+	    	send();
+	    	x=2;
+        	y=seg0[f];
+	        send();
+    	    x=3;
+        	y=seg0[g];
+	        send();
+    	    x=4;
+        	y=seg0[h];
+		    send();
+		    x=5;
+	        y=seg0[17];
+    	    send();
+	        delay(300);
+		}
+		else if (c_f_flag==1)
+		{
+			x=1;
+       		y=seg0[16];
+	    	send();
+	    	x=2;
+        	y=seg0[f1];
+	        send();
+    	    x=3;
+        	y=seg0[g1];
+	        send();
+    	    x=4;
+        	y=seg0[h1];
+		    send();
+		    x=5;
+	        y=seg0[20];
+    	    send();
+	        delay(300);
+		}
+	}
+	else if (shift_right_flag==2)				//第二位闪烁显示
+	{
+	    disp_limit_up0();
+		delay(300);
+		if (c_f_flag==0)
+		{
+	        delay(300);
+			x=1;
+	        y=seg0[e];
+	        send();
+	        x=2;
+	        y=seg0[16];
+	        send();
+	        x=3;
+	        y=seg0[g];
+	        send();
+	        x=4;
+	        y=seg0[h];
+			send();
+			x=5;
+	        y=seg0[17];
+	        send();
+	        delay(300);
+		}
+		else if (c_f_flag==1)
+		{
+	        delay(300);
+			x=1;
+	        y=seg0[e1];
+	        send();
+	        x=2;
+	        y=seg0[16];
+	        send();
+	        x=3;
+	        y=seg0[g1];
+	        send();
+	        x=4;
+	        y=seg0[h1];
+			send();
+			x=5;
+	        y=seg0[20];
+	        send();
+	        delay(300);
+		}
+     }
+	 else if (shift_right_flag==3)			//第三位闪烁显示
+	 {
+	     disp_limit_up0();
+         delay(300);
+		 if (c_f_flag==0)
+		 {		
+			 x=1;
+    	     y=seg0[e];
+        	 send();
+	         x=2;
+		     y=seg0[f];
+	      	 send();
+		     x=3;
+	    	 y=seg0[16];
+		     send();
+		     x=4;
+		     y=seg0[h];
+			 send();
+			 x=5;
+	         y=seg0[17];
+    	 	 send();
+	         delay(300);
+		  }
+  		  else if (c_f_flag==1)
+		  {		
+		     x=1;
+    	     y=seg0[e1];
+        	 send();
+	         x=2;
+		     y=seg0[f1];
+	      	 send();
+		     x=3;
+	    	 y=seg0[16];
+		     send();
+		     x=4;
+		     y=seg0[h1];
+			 send();
+			 x=5;
+	         y=seg0[20];
+    	 	 send();
+	         delay(300);
+		  }
+      }
+	 else if (shift_right_flag==4)			//第四位闪烁显示
+	 {
+	     disp_limit_up0();
+         delay(300);
+		 if (c_f_flag==0)
+		 {		
+		    x=1;
+         	y=seg0[e];
+	        send();
+    	    x=2;
+	    	y=seg0[f];
+      	    send();
+	        x=3;
+            y=seg0[g];
+     	    send();
+	        x=4;
+	        y=seg0[16];
+		    send();
+		    x=5;
+            y=seg0[17];
+     	    send();
+            delay(300);
+          }
+		  else if (c_f_flag==1)
+		  {	
+		    x=1;
+         	y=seg0[e1];
+	        send();
+    	    x=2;
+	    	y=seg0[f1];
+      	    send();
+	        x=3;
+            y=seg0[g1];
+     	    send();
+	        x=4;
+	        y=seg0[16];
+		    send();
+		    x=5;
+            y=seg0[20];
+     	    send();
+            delay(300);
+         }
+      }
+}
+
+void disp_limit_up0(void)			//正常显示，不闪
+{		
+	  //read_par(); 
+	  //par_buf=0x0400;
+      c_f_flag=par_buf[36];
+	  if (c_f_flag==0)
+	  {
+	  	  x=1;
+	      y=seg0[e];
+	      send();
+	      x=2;
+	      y=seg0[f];
+	      send();
+	      x=3;
+	      y=seg0[g];
+	      send();
+	      x=4;
+	      y=seg0[h];
+	      send();
+		  x=5;
+		  y=seg0[17];
+		  send();
+	 }
+	 else if (c_f_flag==1)
+	 {
+	 	  x=1;
+	      y=seg0[e1];
+	      send();
+	      x=2;
+	      y=seg0[f1];
+	      send();
+	      x=3;
+	      y=seg0[g1];
+	      send();
+	      x=4;
+	      y=seg0[h1];
+	      send();
+		  x=5;
+		  y=seg0[20];
+		  send();
+	 }
+}
+
+//下限报警子程序	
+void limit_down(void)          
+{
+	uint data temp_c,temp_f;
+	limit_down0();
+	do
+    { 	
+		WDTCN=0xa5;
+		shift3();
+		key_value_range_0to2000();	  	
+	 }
+	while  (enter_flag==0); 
+	{   
+		//存储数据
+    	//read_par(); 
+		//par_buf=0x0400;
+		c_f_flag=par_buf[36];
+		if (c_f_flag==0)
+		{
+			cf_select();
+			temp_f=temp_f_out;
+			e1=temp_f/1000;
+		    f1=(temp_f%1000)/100;
+   		 	g1=(temp_f%100)/10;
+     		h1=temp_f%10;
+		}
+		else if (c_f_flag==1)
+		{
+			cf_select();
+			temp_c=temp_c_out;
+			e=temp_c/1000;
+		    f=(temp_c%1000)/100;
+			g=(temp_c%100)/10;
+			h=temp_c%10;		
+		}	
+		par_buf[11]=e;
+		par_buf[12]=f;
+		par_buf[13]=g;
+		par_buf[14]=h;
+		par_buf[41]=e1;
+	   	par_buf[42]=f1;
+		par_buf[43]=g1;
+	  	par_buf[44]=h1;
+		EA=0;
+		key_flag_init();
+		//par_buf=0x0400;
+		erase_par();
+		write_par();			//将修改好后的内容写入flash
+		EA=1;			
+	 } 
+}
+
+//显示当前的下限报警值
+void limit_down0(void)
+{
+	uint data temp_c,temp_f;
+    //read_par(); 
+	//par_buf=0x0400;
+	c_f_flag=par_buf[36];
+	if (c_f_flag==0)
+	{
+		e=par_buf[11];
+		f=par_buf[12];
+		g=par_buf[13];
+		h=par_buf[14];
+		cf_select();
+		temp_f=temp_f_out;
+		e1=temp_f/1000;
+		f1=(temp_f%1000)/100;
+		g1=(temp_f%100)/10;
+		h1=temp_f%10;
+	}
+	else if (c_f_flag==1)
+	{
+		e1=par_buf[41];
+		f1=par_buf[42];
+		g1=par_buf[43];
+		h1=par_buf[44];
+		cf_select();
+		temp_c=temp_c_out;
+		e=temp_c/1000;
+		f=(temp_c%1000)/100;
+		g=(temp_c%100)/10;
+		h=temp_c%10;
+	}			
+	shift_right_flag=1;
+	up_flag=0;
+    enter_flag=0;   
+}
+
+//死区范围子程序
+void dead_band(void)
+{
+	uint data dead_band_range;
+	//uchar e,f,g,h;
+   	//read_par(); 
+	//par_buf=0x0400;
+   	e=par_buf[15];              //显示格式相同
+   	f=par_buf[16];
+   	g=par_buf[17];
+	h=par_buf[62];
+	shift_right_flag=1;
+	up_flag=0;
+    enter_flag=0;
+    do
+    { 	
+		WDTCN=0xa5;
+		shift0_4();	//格式相同
+		//判断死区范围在0.00到0.50之间
+		if (enter_flag==1)
+		{
+			dead_band_range=e*1000+f*100+g*10+h;
+			if ( dead_band_range>500)
+			{
+				enter_flag=0;
+			}
+		}
+	 }
+	while  (enter_flag==0); 
+	{   
+		EA=0;
+	    key_flag_init();
+		//par_buf=0x0400;
+		par_buf[15]=e;
+		par_buf[16]=f;
+		par_buf[17]=g;
+		par_buf[62]=h;
+	    erase_par();
+		write_par();			//将修改好后的内容写入flash
+		EA=1;
+	} 
+}
+
+//电流环起始值子程序
+void ma_start(void)
+{
+	uint data temp_c,temp_f;
+	ma_start0();
+	do
+    { 			  	
+		WDTCN=0xa5;
+		shift3();
+		key_value_range_0to2000();
+	 }
+	while  (enter_flag==0); 
+	{   
+		//存储数据
+    	//read_par(); 
+		//par_buf=0x0400;
+		c_f_flag=par_buf[36];
+		if (c_f_flag==0)
+		{
+			cf_select();
+			temp_f=temp_f_out;
+			e1=temp_f/1000;
+		    f1=(temp_f%1000)/100;
+		    g1=(temp_f%100)/10;
+		    h1=temp_f%10;
+		  
+		}
+		else if (c_f_flag==1)
+		{
+			cf_select();
+			temp_c=temp_c_out;
+		  	e=temp_c/1000;
+		  	f=(temp_c%1000)/100;
+		  	g=(temp_c%100)/10;
+		  	h=temp_c%10;
+		}
+		par_buf[18]=e;
+   		par_buf[19]=f;
+		par_buf[20]=g;
+		par_buf[21]=h;
+		par_buf[45]=e1;
+	    par_buf[46]=f1;
+	    par_buf[47]=g1;
+	   	par_buf[48]=h1;			
+	    EA=0;
+	    key_flag_init();
+  	    //par_buf=0x0400;
+	    erase_par();
+	    write_par();			//将修改好后的内容写入flash
+	    EA=1;			
+    } 
+}
+
+void ma_start0(void)
+{
+	uint data temp_c,temp_f;
+    //read_par(); 
+	//par_buf=0x0400;
+	c_f_flag=par_buf[36];
+	if (c_f_flag==0)
+	{
+		e=par_buf[18];
+		f=par_buf[19];
+		g=par_buf[20];
+		h=par_buf[21];
+		cf_select();
+		temp_f=temp_f_out;
+		temp_f=temp_f/10;
+		e1=temp_f/1000;
+		f1=(temp_f%1000)/100;
+		g1=(temp_f%100)/10;
+		h1=temp_f%10;
+	}
+	else if (c_f_flag==1)
+	{
+		e1=par_buf[45];
+		f1=par_buf[46];
+		g1=par_buf[47];
+		h1=par_buf[48];
+		cf_select();
+		temp_c=temp_c_out;
+		temp_c=temp_c/10;
+		e=temp_c/1000;
+		f=(temp_c%1000)/100;
+		g=(temp_c%100)/10;
+		h=temp_c%10;
+	}			
+	shift_right_flag=1;
+	up_flag=0;
+    enter_flag=0;   
+}
+
+	
+//电流环终点值子程序
+void ma_end(void)
+{
+	uint data temp_c,temp_f;
+	ma_end0();
+	do
+    { 	
+		WDTCN=0xa5;
+		shift3();
+		key_value_range_0to2000();	  			
+	 }
+	while  (enter_flag==0); 
+	{   
+		//存储数据
+    	//read_par(); 
+		//par_buf=0x0400;
+		c_f_flag=par_buf[36];
+		if (c_f_flag==0)
+		{
+			cf_select();
+			temp_f=temp_f_out;
+			e1=temp_f/1000;
+			f1=(temp_f%1000)/100;
+			g1=(temp_f%100)/10;
+			h1=temp_f%10;
+		}
+		else if (c_f_flag==1)
+		{		
+			cf_select();
+			temp_c=temp_c_out;
+			e=temp_c/1000;
+			f=(temp_c%1000)/100;
+			g=(temp_c%100)/10;
+			h=temp_c%10;
+		}
+		par_buf[22]=e;
+   	 	par_buf[23]=f;
+		par_buf[24]=g;
+		par_buf[25]=h;
+		par_buf[49]=e1;
+	   	par_buf[50]=f1;
+	   	par_buf[51]=g1;
+	   	par_buf[52]=h1;
+	    EA=0;
+	    key_flag_init();
+  	    //par_buf=0x0400;
+	    erase_par();
+	    write_par();			//将修改好后的内容写入flash
+	    EA=1;			
+    } 
+}
+
+//显示电流环终点值
+void ma_end0(void)
+{
+	uint data temp_c,temp_f;
+    //read_par(); 
+	//par_buf=0x0400;
+	c_f_flag=par_buf[36];
+	if (c_f_flag==0)
+	{
+		e=par_buf[22];
+		f=par_buf[23];
+		g=par_buf[24];
+		h=par_buf[25];
+		cf_select();
+		temp_f=temp_f_out;
+		e1=temp_f/1000;
+	    f1=temp_f/100-e1*10;
+        g1=temp_f/10-e1*100-f1*10;
+	    h1=temp_f-e1*1000-f1*100-g1*10;
+	}
+	else if (c_f_flag==1)
+	{
+		e1=par_buf[49];
+		f1=par_buf[50];
+		g1=par_buf[51];
+		h1=par_buf[52];
+		cf_select();
+		temp_c=temp_c_out;
+		e=temp_c/1000;
+	    f=temp_c/100-e*10;
+	    g=temp_c/10-e*100-f*10;
+		h=temp_c-e*1000-f*100-g*10;
+	}			
+	shift_right_flag=1;
+	up_flag=0;
+    enter_flag=0;   
+}
+
+//显示当前的比值信号
+void disp_single(void)
+{
+	uchar data a,b,c,d;
+	ulong data real_out;
+	uint data real_out_temp;
+	shift_right_flag=1;
+	up_flag=0;
+    enter_flag=0;
+    do
+    { 	
+		WDTCN=0xa5;
+		sample_average();
+		real_out=tobj_result;
+		real_out=real_out*1000;
+		real_out=real_out>>12;
+		real_out_temp=(uint)(real_out);
+		a=real_out_temp/1000;
+	    b=(real_out_temp%1000)/100;
+        c=(real_out_temp%100)/10;
+	    d=real_out_temp%10;
+	    x=1;
+		y=seg1[a];
+		send();
+		x=2;
+		y=seg0[b];
+		send();
+		x=3;
+		y=seg0[c];
+		send();
+		x=4;
+		y=seg0[d];
+		send();
+		x=5;
+		y=seg0[16];
+		send();
+	}
+	while  (enter_flag==0); 
+	{   
+	    key_flag_init();		
+	} 
+}
+
+void disp_zero_compensate(void)
+{	
+    //read_par(); 
+	//par_buf=0x0400;
+    e=par_buf[32];
+   	f=par_buf[33];
+   	g=par_buf[34];
+   	h=par_buf[35];
+	shift_right_flag=1;
+	up_flag=0;
+    enter_flag=0;
+    do
+    { 	
+		disp_zero_temp();	  	 
+		WDTCN=0xa5;
+	 }
+	while  (enter_flag==0); 
+	{   
+		EA=0;
+	    key_flag_init();
+		//par_buf=0x0400;
+		par_buf[32]=e;
+		par_buf[33]=f;
+		par_buf[34]=g;
+		par_buf[35]=h;
+	    erase_par();
+		write_par();			//将修改好后的内容写入flash
+		EA=1;			
+	} 
+}
+
+void disp_zero_temp(void)
+{
+	if (shift_right_flag==1)			//第一位闪烁
+	  {    
+	  	 up_flag=e;
+    	 do
+		 { 
+		  	WDTCN=0xa5;
+			if (up_flag==0)
+			{
+				e=0;
+			}
+			else  if (up_flag==1)
+			{
+				e=1;
+			}
+			 else if (up_flag>1)
+			{
+				e=0;	
+				up_flag=0;
+            }
+ 			disp_zero();
+		  }
+          while ( (shift_right_flag==1)&&(enter_flag==0) );		 
+	  }
+	  else if (shift_right_flag==2)			//第二位闪烁
+	  {  
+	    up_flag=f;   
+		do
+		{ 
+		  	WDTCN=0xa5;
+			switch(up_flag)
+			{
+			    case 0: f=0; break;
+				case 1:	f=1; break;
+				case 2: f=2; break;
+				case 3: f=3; break;
+				case 4: f=4; break;
+				case 5: f=5; break;
+				case 6: f=6; break;
+				case 7: f=7; break;
+				case 8: f=8; break;
+				case 9: f=9; break;
+				case 10: f=0; break;
+            }
+ 			disp_zero();
+         } 
+			while ( (shift_right_flag==2)&&(enter_flag==0) );			 
+	  }	 
+	  else if (shift_right_flag==3)		//第三位闪烁
+	  {
+	     up_flag=g;
+	     do
+		 { 
+		  	WDTCN=0xa5;
+			switch(up_flag)
+			{
+			    case 0: g=0; break;
+				case 1:	g=1; break;
+				case 2: g=2; break;
+				case 3: g=3; break;
+				case 4: g=4; break;
+				case 5: g=5; break;
+				case 6: g=6; break;
+				case 7: g=7; break;
+				case 8: g=8; break;
+				case 9: g=9; break;
+				case 10: g=0; break;
+            }
+ 			disp_zero();
+         } 
+			while ( (shift_right_flag==3)&&(enter_flag==0) );	
+	 }
+	 else if (shift_right_flag==4)		//第四位闪烁
+	  {
+	     up_flag=h;
+	     do
+		 { 
+		  	WDTCN=0xa5;
+			switch(up_flag)
+			{
+			    case 0: h=0; break;
+				case 1:	h=1; break;
+				case 2: h=2; break;
+				case 3: h=3; break;
+				case 4: h=4; break;
+				case 5: h=5; break;
+				case 6: h=6; break;
+				case 7: h=7; break;
+				case 8: h=8; break;
+				case 9: h=9; break;
+				case 10: h=0; break;
+            }
+ 			disp_zero();
+         } 
+			while ( (shift_right_flag==4)&&(enter_flag==0) );	
+	 }
+}
+
+void disp_zero(void)
+{
+   if (shift_right_flag==1)			//第一位闪烁显示
+   {
+        disp_zero0();  
+	    delay(300);
+        x=1;
+        y=seg0[16];
+	    send();
+	    x=2;
+        y=seg1[f];
+        send();
+        x=3;
+        y=seg0[g];
+        send();
+        x=4;
+        y=seg0[h];
+	    send();
+	    x=5;
+        y=seg0[16];
+        send();
+        delay(300);
+	}
+	else if (shift_right_flag==2)				//第二位闪烁显示
+	{
+	    disp_zero0();
+        delay(300);
+		x=1;
+        y=seg0[e];
+        send();
+        x=2;
+        y=seg0[16];
+        send();
+        x=3;
+        y=seg0[g];
+        send();
+        x=4;
+        y=seg0[h];
+		send();
+		x=5;
+        y=seg0[16];
+        send();
+        delay(300);
+     }
+	 else if (shift_right_flag==3)			//第三位闪烁显示
+	 {
+	     disp_zero0();
+         delay(300);
+         x=1;
+         y=seg0[e];
+         send();
+         x=2;
+	     y=seg1[f];
+      	 send();
+	     x=3;
+    	 y=seg0[16];
+	     send();
+	     x=4;
+	     y=seg0[h];
+		 send();
+		 x=5;
+         y=seg0[16];
+     	 send();
+         delay(300);
+      }
+	 else if (shift_right_flag==4)			//第四位闪烁显示
+	 {
+	     disp_zero0();
+         delay(300);
+         x=1;
+         y=seg0[e];
+         send();
+         x=2;
+	     y=seg1[f];
+      	 send();
+	     x=3;
+    	 y=seg0[g];
+	     send();
+	     x=4;
+	     y=seg0[16];
+		 send();
+		 x=5;
+         y=seg0[16];
+     	 send();
+         delay(300);
+      }
+}
+
+
+void disp_zero0(void)
+{
+  	x=1;
+    y=seg0[e];
+    send();
+    x=2;
+	y=seg1[f];
+    send();
+	x=3;
+   	y=seg0[g];
+	send();
+	x=4;
+	y=seg0[h];
+	send();
+	x=5;
+    y=seg0[16];
+    send();
+}
+
+void disp(uchar m)
+{
+	x=1;
+	y=seg0[m];
+	send();
+	x=2;
+	y=seg0[18];
+	send();
+	x=3;
+	y=seg0[16];
+	send();
+	x=4;
+	y=seg0[16];
+	send();
+	x=5;
+	y=seg0[16];
+	send();
+    delay(300);
+	x=1;
+	y=seg0[16];
+	send();
+	x=2;
+	y=seg0[18];
+	send();
+	x=3;
+	y=seg0[16];
+	send();
+	x=4;
+	y=seg0[16];
+	send();
+	x=5;
+	y=seg0[16];
+	send();
+    delay(300);
+}
+
+void disp2(uchar m)
+{
+	x=1;
+	y=seg0[1];
+	send();
+	x=2;
+	y=seg0[m];
+	send();
+	x=3;
+	y=seg0[18];
+	send();
+	x=4;
+	y=seg0[16];
+	send();
+	x=5;
+	y=seg0[16];
+	send();
+    delay(300);
+	x=1;
+	y=seg0[16];
+	send();
+	x=2;
+	y=seg0[16];
+	send();
+	x=3;
+	y=seg0[16];
+	send();
+	x=4;
+	y=seg0[16];
+	send();
+	x=5;
+	y=seg0[16];
+	send();
+    delay(300);
+}
+
+//----------------------------------------------------------------//
+//----------------------------flash.c-----------------------------//
+//----------------------------------------------------------------//
+
+//首次上电初始化,将外部数据初始化为0xff
+void erase_par(void)
+{
+  //if (erase_enable==1)
+  //{
+  FLSCL=0x88;				//设置flash预分频寄存器对12MHz系统时钟
+  PSCTL=0x03;				//PSWE=PSEE=1;
+  pwrite=0x8000;
+  *pwrite=0;
+  PSCTL=0;
+  WDTCN=0xa5;				//重写看门狗  			
+	//}
+}
+
+
+void init_par(void)		
+{
+  	uchar data i;
+	//if (erase_enable==1)
+	//{
+		FLSCL=0x88;				//设置flash预分频寄存器对12MHz系统时钟
+		PSCTL=0x01;				//PSWE=1;PSEE=0
+		par=&par1[0];
+		pwrite=0x8000;
+		for (i=0;i<75;i++)
+		{
+		    *pwrite=*par;
+			pwrite++;
+			par++;
+  			WDTCN=0xa5;
+		} 
+		read_par();
+	//}
+}
+
+void read_par(void)
+{  
+   uchar data i;
+   FLSCL=0x8f;				//禁止flash写
+   PSCTL=0;				    //PSWE=0;PSEE=0;
+   pread=0x8000;			//初始化code读指针为字符串起始变量
+   for(i=0;i<75;i++)
+   {
+  	  par_buf[i]=*pread;		//将FLASH内数据读到XRAM
+	  pread++;
+	  WDTCN=0xa5;
+    }	
+}
+	
+void write_par(void)
+{
+    uchar data i;
+	//if (erase_enable==1)
+	//{
+		FLSCL=0x88;
+		PSCTL=0x01;				//PSWE=1;PSEE=0;
+		pwrite=0x8000;
+		for (i=0;i<75;i++)	
+		{
+			*pwrite=par_buf[i];
+			pwrite++;
+		 }
+    	WDTCN=0xa5;
+		read_par();	
+	//}
+}
+
+//程序最多只能为32255
